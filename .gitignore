@@ -6,6 +6,7 @@ ai-service/*.pyc
 
 backend/uploads/
 backend/node_modules/
+backend/logs/
 
 frontend/node_modules/
 frontend/dist/

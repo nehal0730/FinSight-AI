@@ -3,19 +3,23 @@ const axios = require("axios"); //for making HTTP requests
 const fs = require("fs"); //for file system operations
 const FormData = require("form-data"); //to create form data for file upload
 const upload = require("../middleware/upload.js");
+const auth = require("../middleware/auth");
 const { generateSafeFilename } = require("../utils/file");
+const { deleteFile } = require("../utils/cleanup");
+const logger = require("../config/logger");
 const { AI_SERVICE_URL } = require("../config/env");
 
 const router = express.Router();
 
-router.post("/", upload.single("file"), async (req, res, next) => {
+router.post("/", auth, upload.single("file"), async (req, res, next) => {
+  let newPath;
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
     
     const safeFilename = generateSafeFilename(req.file.originalname);
-    const newPath = `uploads/${safeFilename}`;
+    newPath = `uploads/${safeFilename}`;
 
     fs.renameSync(req.file.path, newPath);
 
@@ -33,6 +37,8 @@ router.post("/", upload.single("file"), async (req, res, next) => {
       { headers: formData.getHeaders() }
     );
 
+    logger.info(`File processed: ${safeFilename}`);
+
     res.status(200).json({
       success: true,
       data: {
@@ -44,6 +50,7 @@ router.post("/", upload.single("file"), async (req, res, next) => {
     });
 
   } catch (err) {
+    logger.error(err.message);
     next(err);
     // console.error(err.message);
 
@@ -55,6 +62,10 @@ router.post("/", upload.single("file"), async (req, res, next) => {
     //     message: "File processing failed"
     //   }
     // });
+  } finally {
+    if (newPath) {
+      deleteFile(newPath);
+    }
   }
 });
 

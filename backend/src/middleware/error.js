@@ -1,5 +1,7 @@
+const logger = require("../config/logger");
+
 module.exports = ((err, req, res, next) => {
-  console.error(err.message);
+  logger.error(err.message);
 
   res.status(400).json({
     success: false,

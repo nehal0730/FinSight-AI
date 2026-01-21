@@ -1,14 +1,21 @@
 const express = require("express");
-const cors = require("cors"); //Browsers block requests between different ports by default, CORS allows frontend (5173) to talk to backend (5000)
+const cors = require("cors"); // browser cannot make requests to a different ports of frotend, backend, etc unless CORS is enabled
+const cookieParser = require("cookie-parser");
 
 const uploadRoutes = require("./routes/upload");
 const healthRoutes = require("./routes/health");
+const authRoutes = require("./routes/auth");
 const errorHandler = require("./middleware/error");
+const requestLogger = require("./middleware/request");
 
 const app = express();
 
-app.use(cors({ origin: "http://localhost:5173" }));
+app.use(cors({ origin: "http://localhost:5173", credentials: false }));
+app.use(express.json());
+app.use(cookieParser());
+app.use(requestLogger);
 
+app.use("/auth", authRoutes);
 app.use("/upload", uploadRoutes);
 app.use("/health", healthRoutes);
 

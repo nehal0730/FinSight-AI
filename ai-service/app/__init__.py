@@ -1,0 +1,1 @@
+"""FinSight AI Service - Financial document analysis and OCR processing"""

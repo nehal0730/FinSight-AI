@@ -2,12 +2,23 @@ import { Link, useLocation } from 'react-router-dom';
 
 export default function Navbar() {
   const location = useLocation();
-  const user = localStorage.getItem('user');
+  const userRaw = localStorage.getItem('user') || sessionStorage.getItem('user');
+  let userName = '';
+  try {
+    const parsedUser = userRaw ? JSON.parse(userRaw) : null;
+    userName = parsedUser?.name || userRaw || '';
+  } catch {
+    userName = userRaw || '';
+  }
+  const isLoggedIn = Boolean(localStorage.getItem('authToken') || sessionStorage.getItem('authToken'));
   
   const isActive = (path) => location.pathname === path;
   
   const handleLogout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('authToken');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('authToken');
     window.location.href = '/login';
   };
 
@@ -25,7 +36,7 @@ export default function Navbar() {
               <span className="text-2xl font-bold text-indigo-600">FinSight AI</span>
             </Link>
             
-            {user && (
+            {isLoggedIn && (
               <div className="hidden md:flex space-x-4">
                 <Link
                   to="/upload"
@@ -72,9 +83,9 @@ export default function Navbar() {
           </div>
           
           <div className="flex items-center space-x-4">
-            {user ? (
+            {isLoggedIn ? (
               <>
-                <span className="text-sm text-gray-600">Welcome, {user}</span>
+                <span className="text-sm text-gray-600">Welcome, {userName}</span>
                 <button
                   onClick={handleLogout}
                   className="btn-secondary text-sm"

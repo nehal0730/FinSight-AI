@@ -1,29 +1,30 @@
 import { Link } from 'react-router-dom';
+import { Rocket, Bot, Shield, MessageCircle, BarChart3, FileText, Search, Sparkles } from 'lucide-react';
 
 export default function Home() {
   const features = [
     {
       title: 'AI-Powered Analysis',
       description: 'Advanced machine learning algorithms analyze your financial documents in seconds',
-      icon: '🤖',
+      icon: <Bot className="w-6 h-6 text-white" />,
       gradient: 'from-indigo-600 to-indigo-700',
     },
     {
       title: 'Risk Assessment',
       description: 'Comprehensive risk scoring and identification of potential financial threats',
-      icon: '🛡️',
+      icon: <Shield className="w-6 h-6 text-white" />,
       gradient: 'from-cyan-600 to-teal-700',
     },
     {
       title: 'Real-time Chat',
       description: 'Ask questions and get instant insights from your AI financial assistant',
-      icon: '💬',
+      icon: <MessageCircle className="w-6 h-6 text-white" />,
       gradient: 'from-indigo-700 to-cyan-600',
     },
     {
       title: 'Visual Reports',
       description: 'Beautiful charts and dashboards to visualize your financial data',
-      icon: '📊',
+      icon: <BarChart3 className="w-6 h-6 text-white" />,
       gradient: 'from-slate-700 to-indigo-600',
     },
   ];
@@ -42,7 +43,7 @@ export default function Home() {
         <div className="text-center animate-fadeInUp">
           <div className="inline-block mb-4">
             <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 animate-pulse-glow">
-              🚀 Transform Your Financial Analysis
+              <Rocket className="w-4 h-4 mr-2" /> Transform Your Financial Analysis
             </span>
           </div>
           
@@ -137,7 +138,7 @@ export default function Home() {
                 className="group relative bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 animate-fadeInUp border border-gray-100"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <div className={`h-14 w-14 bg-gradient-to-r ${feature.gradient} rounded-xl flex items-center justify-center mb-6 text-3xl group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
+                <div className={`h-14 w-14 bg-gradient-to-r ${feature.gradient} rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-lg`}>
                   {feature.icon}
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-indigo-600 transition-colors">
@@ -163,16 +164,16 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {[
-              { step: '1', title: 'Upload Document', desc: 'Simply upload your financial PDF document to our secure platform', icon: '📄' },
-              { step: '2', title: 'AI Analysis', desc: 'Our AI analyzes your document and generates comprehensive insights', icon: '🔍' },
-              { step: '3', title: 'Get Insights', desc: 'View your dashboard, chat with AI, and download detailed reports', icon: '✨' },
+              { step: '1', title: 'Upload Document', desc: 'Simply upload your financial PDF document to our secure platform', icon: <FileText className="w-10 h-10 text-indigo-600" /> },
+              { step: '2', title: 'AI Analysis', desc: 'Our AI analyzes your document and generates comprehensive insights', icon: <Search className="w-10 h-10 text-indigo-600" /> },
+              { step: '3', title: 'Get Insights', desc: 'View your dashboard, chat with AI, and download detailed reports', icon: <Sparkles className="w-10 h-10 text-indigo-600" /> },
             ].map((item, index) => (
               <div key={index} className="text-center animate-fadeInUp" style={{ animationDelay: `${index * 0.2}s` }}>
                 <div className="relative mb-6">
                   <div className="h-20 w-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center text-4xl font-bold mx-auto shadow-xl animate-pulse-glow">
                     {item.step}
                   </div>
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 text-4xl">
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
                     {item.icon}
                   </div>
                 </div>

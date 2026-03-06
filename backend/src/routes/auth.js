@@ -4,11 +4,11 @@ const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
 const User = require("../models/User");
 const auth = require("../middleware/auth");
-const { JWT_SECRET } = require("../config/env");
+const { JWT_SECRET, ADMIN_SECRET_KEY } = require("../config/env");
 
 const router = express.Router();
 
-const signToken = (userId) => jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: "7d" });
+const signToken = (user) => jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
 
 router.post(
   "/register",
@@ -23,7 +23,7 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, email, password } = req.body;
+    const { name, email, password, adminSecret } = req.body;
 
     try {
       const existing = await User.findOne({ email });
@@ -31,12 +31,23 @@ router.post(
         return res.status(409).json({ error: "Email already registered" });
       }
 
-      const hashed = await bcrypt.hash(password, 10);
-      const user = await User.create({ name, email, password: hashed });
+      const isAdmin = Boolean(
+        adminSecret && ADMIN_SECRET_KEY && adminSecret === ADMIN_SECRET_KEY
+      );
 
-      const token = signToken(user._id);
+      const hashed = await bcrypt.hash(password, 10);
+      const user = await User.create({ 
+        name, 
+        email, 
+        password: hashed,
+        role: isAdmin ? 'admin' : 'user'
+      });
+
+      console.log(`✓ User registered: ${user.name}, Email: ${user.email}, Role: ${user.role}`);
+
+      const token = signToken(user);
       return res.status(201).json({
-        user: { id: user._id, name: user.name, email: user.email },
+        user: { id: user._id, name: user.name, email: user.email, role: user.role },
         token,
       });
     } catch (err) {
@@ -71,8 +82,10 @@ router.post(
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
-      const token = signToken(user._id);
-      return res.json({ user: { id: user._id, name: user.name, email: user.email }, token });
+      console.log(`✓ User logged in: ${user.name}, Email: ${user.email}, Role: ${user.role}`);
+
+      const token = signToken(user);
+      return res.json({ user: { id: user._id, name: user.name, email: user.email, role: user.role }, token });
     } catch (err) {
       console.error("Login error:", err.message);
       return res.status(500).json({ error: "Server error" });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, BarChart3, FileText, Calendar, TrendingUp, Search, Lightbulb } from 'lucide-react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -88,7 +89,9 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="card max-w-md text-center">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <div className="text-red-500 text-5xl mb-4">
+            <AlertTriangle className="w-16 h-16 mx-auto" />
+          </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Data</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <p className="text-sm text-gray-500 mb-4">Using sample data instead</p>
@@ -191,14 +194,14 @@ export default function Dashboard() {
         <div className="mb-10 animate-fadeInUp">
           <div className="flex items-center space-x-4 mb-4">
             <div className="inline-flex items-center justify-center h-14 w-14 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl shadow-lg">
-              <span className="text-2xl">📊</span>
+              <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-700 to-cyan-600 bg-clip-text text-transparent">
                 Analysis Dashboard
               </h1>
               <p className="text-gray-600 mt-1">
-                📄 {safeAnalysisData.fileName} • 📅 {safeAnalysisData.uploadDate}
+                <FileText className="w-4 h-4 inline mr-1" /> {safeAnalysisData.fileName} • <Calendar className="w-4 h-4 inline ml-2 mr-1" /> {safeAnalysisData.uploadDate}
               </p>
             </div>
           </div>
@@ -207,7 +210,7 @@ export default function Dashboard() {
         {/* Risk Score Meter Card */}
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-10 mb-10 border border-white/20 animate-fadeInUp delay-100">
           <h2 className="text-3xl font-bold text-gray-900 mb-8 flex items-center">
-            <span className="text-3xl mr-3">⚠️</span> Overall Risk Assessment
+            <AlertTriangle className="w-8 h-8 mr-3" /> Overall Risk Assessment
           </h2>
           <div className="flex flex-col lg:flex-row items-center justify-between gap-10">
             {/* Score Circle */}
@@ -270,10 +273,10 @@ export default function Dashboard() {
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10 animate-fadeInUp delay-200">
           {[
-            { label: 'Revenue', value: safeAnalysisData.metrics.revenue, icon: '💰', color: 'from-indigo-600 to-indigo-700' },
-            { label: 'Expenses', value: safeAnalysisData.metrics.expenses, icon: '📉', color: 'from-orange-600 to-orange-700' },
-            { label: 'Profit', value: safeAnalysisData.metrics.profit, icon: '📈', color: 'from-green-600 to-green-700' },
-            { label: 'Profit Margin', value: safeAnalysisData.metrics.profitMargin, icon: '📊', color: 'from-cyan-600 to-cyan-700' },
+            { label: 'Revenue', value: safeAnalysisData.metrics.revenue, icon: <TrendingUp className="w-5 h-5" />, color: 'from-indigo-600 to-indigo-700' },
+            { label: 'Expenses', value: safeAnalysisData.metrics.expenses, icon: <TrendingUp className="w-5 h-5 rotate-180" />, color: 'from-orange-600 to-orange-700' },
+            { label: 'Profit', value: safeAnalysisData.metrics.profit, icon: <TrendingUp className="w-5 h-5" />, color: 'from-green-600 to-green-700' },
+            { label: 'Profit Margin', value: safeAnalysisData.metrics.profitMargin, icon: <BarChart3 className="w-5 h-5" />, color: 'from-cyan-600 to-cyan-700' },
           ].map((metric, idx) => (
             <div
               key={idx}
@@ -294,13 +297,13 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10 animate-fadeInUp delay-300">
           <div className="bg-white/80 backdrop-blur-xl rounded-xl shadow-lg p-8 border border-white/20">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-2xl mr-2">📈</span> Revenue vs Expenses Trend
+              <TrendingUp className="w-6 h-6 mr-2" /> Revenue vs Expenses Trend
             </h3>
             <Line data={lineChartData} options={{ responsive: true, maintainAspectRatio: true }} />
           </div>
           <div className="bg-white/80 backdrop-blur-xl rounded-xl shadow-lg p-8 border border-white/20">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-2xl mr-2">⚠️</span> Risk Factor Analysis
+              <AlertTriangle className="w-6 h-6 mr-2" /> Risk Factor Analysis
             </h3>
             <Bar data={barChartData} options={{ responsive: true, maintainAspectRatio: true }} />
           </div>
@@ -310,7 +313,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10 animate-fadeInUp delay-400">
           <div className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-xl shadow-lg p-8 border border-white/20">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-2xl mr-2">🔍</span> Detailed Risk Factors
+              <Search className="w-6 h-6 mr-2" /> Detailed Risk Factors
             </h3>
             <div className="space-y-5">
               {safeAnalysisData.riskFactors.map((factor, index) => (
@@ -342,7 +345,7 @@ export default function Dashboard() {
           </div>
           <div className="bg-white/80 backdrop-blur-xl rounded-xl shadow-lg p-8 border border-white/20">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-2xl mr-2">📊</span> Risk Distribution
+              <BarChart3 className="w-6 h-6 mr-2" /> Risk Distribution
             </h3>
             <Doughnut
               data={doughnutData}
@@ -354,7 +357,7 @@ export default function Dashboard() {
         {/* AI Insights */}
         <div className="bg-white/80 backdrop-blur-xl rounded-xl shadow-lg p-8 border border-white/20 animate-fadeInUp delay-500">
           <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-            <span className="text-2xl mr-2">💡</span> AI-Powered Insights
+            <Lightbulb className="w-6 h-6 mr-2" /> AI-Powered Insights
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {safeAnalysisData.insights.map((insight, index) => (

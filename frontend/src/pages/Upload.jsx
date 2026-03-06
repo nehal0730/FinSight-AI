@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { FileText, Zap, Lock, BarChart3, AlertTriangle, CheckCircle, Search } from 'lucide-react';
 
 export default function Upload() {
   const [file, setFile] = useState(null);
@@ -29,6 +30,13 @@ export default function Upload() {
       return;
     }
 
+    const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+    if (!token) {
+      alert('Please login first.');
+      navigate('/login');
+      return;
+    }
+
     setUploading(true);
     setProgress(0);
 
@@ -51,11 +59,19 @@ export default function Upload() {
         const res = await axios.post('http://localhost:5000/upload', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`,
           },
         });
         localStorage.setItem('analysisResult', JSON.stringify(res.data));
       } catch (apiErr) {
-        // If backend fails, use dummy data
+        const status = apiErr?.response?.status;
+        if (status === 401) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('user');
+          alert('Session expired or invalid. Please login again.');
+          navigate('/login');
+          return;
+        }
         console.warn('Backend unavailable, using dummy data', apiErr);
         localStorage.setItem('analysisResult', JSON.stringify(getDummyAnalysisData()));
       }
@@ -131,7 +147,7 @@ export default function Upload() {
         {/* Header */}
         <div className="text-center mb-12 animate-fadeInUp">
           <div className="inline-flex items-center justify-center h-16 w-16 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-2xl mb-4 shadow-lg">
-            <span className="text-3xl">📄</span>
+            <FileText className="w-9 h-9 text-white" />
           </div>
           <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-700 to-cyan-600 bg-clip-text text-transparent mb-4">
             Upload Financial Document
@@ -265,7 +281,7 @@ export default function Upload() {
           <div className="bg-white/80 backdrop-blur-xl rounded-xl shadow-lg p-8 border border-white/20 hover:shadow-xl transition-all group">
             <div className="flex items-start space-x-4">
               <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-lg flex items-center justify-center text-white text-xl">
-                ⚡
+                <Zap className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-bold text-lg text-gray-900 mb-2">Fast Processing</h3>
@@ -277,7 +293,7 @@ export default function Upload() {
           <div className="bg-white/80 backdrop-blur-xl rounded-xl shadow-lg p-8 border border-white/20 hover:shadow-xl transition-all group">
             <div className="flex items-start space-x-4">
               <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-r from-cyan-600 to-cyan-700 rounded-lg flex items-center justify-center text-white text-xl">
-                🔒
+                <Lock className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-bold text-lg text-gray-900 mb-2">Secure & Private</h3>
@@ -292,13 +308,13 @@ export default function Upload() {
           <h3 className="font-bold text-xl text-gray-900 mb-6">What Our AI Analyzes:</h3>
           <div className="grid md:grid-cols-2 gap-4">
             {[
-              { icon: '📊', title: 'Financial Metrics', desc: 'Revenue, expenses, margins, and key ratios' },
-              { icon: '⚠️', title: 'Risk Assessment', desc: 'Identify potential financial threats' },
-              { icon: '✓', title: 'Compliance Check', desc: 'Verify regulatory compliance' },
-              { icon: '🔍', title: 'Anomalies', desc: 'Detect unusual patterns and red flags' },
+              { icon: <BarChart3 className="w-6 h-6" />, title: 'Financial Metrics', desc: 'Revenue, expenses, margins, and key ratios' },
+              { icon: <AlertTriangle className="w-6 h-6" />, title: 'Risk Assessment', desc: 'Identify potential financial threats' },
+              { icon: <CheckCircle className="w-6 h-6" />, title: 'Compliance Check', desc: 'Verify regulatory compliance' },
+              { icon: <Search className="w-6 h-6" />, title: 'Anomalies', desc: 'Detect unusual patterns and red flags' },
             ].map((item, idx) => (
               <div key={idx} className="flex items-start space-x-3 p-4 rounded-lg hover:bg-gray-50 transition-colors">
-                <span className="text-2xl flex-shrink-0">{item.icon}</span>
+                <span className="text-indigo-600 flex-shrink-0">{item.icon}</span>
                 <div>
                   <p className="font-semibold text-gray-900">{item.title}</p>
                   <p className="text-sm text-gray-600">{item.desc}</p>

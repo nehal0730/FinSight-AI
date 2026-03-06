@@ -200,6 +200,32 @@ async def analyze_file(
         store = TextStore()
         storage_ref = store.save(file.filename, cleaned_text)
 
+        # RAG INDEXING - Index document for question answering
+        try:
+            from app.services.rag.rag_pipeline import RAGPipeline
+            from app.config.rag_config import get_rag_config
+            
+            # Get document ID from storage ref (unique file identifier)
+            document_id = storage_ref.id
+            
+            api_logger.info(f"Indexing document for RAG: {document_id}")
+            
+            # Initialize RAG pipeline and index document
+            rag_config = get_rag_config()
+            rag_pipeline = RAGPipeline(rag_config)
+            
+            index_result = rag_pipeline.index_document(
+                text=cleaned_text,
+                document_id=document_id,
+                page_ranges=extracted.page_ranges,
+                force_reindex=True
+            )
+            
+            api_logger.info(f"Document indexed successfully: {document_id}, chunks: {index_result.get('chunks_created', 'N/A')}")
+        except Exception as index_error:
+            # Don't fail analysis if indexing fails
+            api_logger.error(f"RAG indexing failed (non-fatal): {index_error}")
+
         log_file_upload(file.filename, bytes_written, file_hash)
         
         # Schedule temp file cleanup as background task (non-blocking)

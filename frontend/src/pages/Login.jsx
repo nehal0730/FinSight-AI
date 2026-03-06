@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { Lock, Eye, EyeOff, Circle, Square } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000';
 
@@ -8,12 +9,13 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
-    const existing = localStorage.getItem('authToken');
+    const existing = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
     if (existing) navigate('/upload');
   }, [navigate]);
 
@@ -24,8 +26,18 @@ export default function Login() {
     try {
       const res = await axios.post(`${API_URL}/auth/login`, { email, password });
       const { user, token } = res.data;
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('user', JSON.stringify(user));
+      
+      if (rememberMe) {
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        sessionStorage.removeItem('authToken');
+        sessionStorage.removeItem('user');
+      } else {
+        sessionStorage.setItem('authToken', token);
+        sessionStorage.setItem('user', JSON.stringify(user));
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+      }
       navigate('/upload');
     } catch (err) {
       const msg = err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || 'Login failed';
@@ -46,7 +58,7 @@ export default function Login() {
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-white/20 animate-fadeInUp">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center h-14 w-14 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl mb-4 shadow-lg">
-              <span className="text-2xl">🔐</span>
+              <Lock className="w-7 h-7 text-white" />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-cyan-600 bg-clip-text text-transparent mb-2">
               Welcome Back
@@ -85,14 +97,19 @@ export default function Login() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
                 >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                  {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
             <div className="flex items-center justify-between">
               <label className="flex items-center">
-                <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-indigo-600" />
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-indigo-600" 
+                />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
               <Link to="#" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
@@ -118,10 +135,10 @@ export default function Login() {
 
           <div className="grid grid-cols-2 gap-3">
             <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
-              <span className="text-xl">🔵</span>
+              <Circle className="w-5 h-5 text-blue-600 fill-blue-600" />
             </button>
             <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
-              <span className="text-xl">🟦</span>
+              <Square className="w-5 h-5 text-blue-700 fill-blue-700" />
             </button>
           </div>
 

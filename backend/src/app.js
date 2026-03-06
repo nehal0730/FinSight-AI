@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const uploadRoutes = require("./routes/upload");
 const healthRoutes = require("./routes/health");
 const authRoutes = require("./routes/auth");
+const queryRoutes = require("./routes/query");
 const errorHandler = require("./middleware/error");
 const requestLogger = require("./middleware/request");
 
@@ -17,6 +18,7 @@ app.use(requestLogger);
 
 app.use("/auth", authRoutes);
 app.use("/upload", uploadRoutes);
+app.use("/query", queryRoutes);
 app.use("/health", healthRoutes);
 
 app.use(errorHandler);

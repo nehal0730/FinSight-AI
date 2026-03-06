@@ -12,6 +12,7 @@ class ExtractionResult:
     filename: str
     pages: int
     extracted_text: str
+    page_ranges: list  # List of (page_num, page_text) tuples
     ocr_pages_count: int  # Track OCR usage
 
 
@@ -37,25 +38,29 @@ class PDFProcessor:
             pdf_path: Path to PDF file
         
         Returns:
-            ExtractionResult with filename, page count, extracted text, and OCR metrics
+            ExtractionResult with filename, page count, extracted text, page_ranges, and OCR metrics
         """
         page_text_chunks: list[str] = []
+        page_ranges: list = []  # Track (page_num, text) for each page
         ocr_pages_count = 0
 
         with pdfplumber.open(str(pdf_path)) as pdf:
             total_pages = len(pdf.pages)
 
-            for page in pdf.pages:
+            for page_idx, page in enumerate(pdf.pages):
+                page_num = page_idx + 1  # 1-indexed
                 native_text = (page.extract_text() or "").strip()
 
                 if native_text:
                     page_text_chunks.append(native_text)
+                    page_ranges.append((page_num, native_text))
                     continue
 
                 ocr_pages_count += 1
                 ocr_text = self.ocr_service.extract_text_from_page_image(page).strip()
                 if ocr_text:
                     page_text_chunks.append(ocr_text)
+                    page_ranges.append((page_num, ocr_text))
 
         # Combine all pages, filtering empty chunks
         combined_text = "\n\n".join(
@@ -66,5 +71,6 @@ class PDFProcessor:
             filename=pdf_path.name,
             pages=total_pages,
             extracted_text=combined_text,
+            page_ranges=page_ranges,
             ocr_pages_count=ocr_pages_count,
         )

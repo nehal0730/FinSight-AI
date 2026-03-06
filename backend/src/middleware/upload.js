@@ -1,8 +1,9 @@
 const multer = require("multer"); //for handling file uploads
 const { MAX_FILE_SIZE } = require("../config/env");
 
+// Store files in memory (buffer) instead of disk for direct streaming to AI service
 const upload = multer({
-  dest: "uploads/",
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: MAX_FILE_SIZE, // 50 MB
   },

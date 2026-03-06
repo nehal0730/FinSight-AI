@@ -1,15 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import { Send, RefreshCw, Bot, Pin } from 'lucide-react';
 
 export default function Chat() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Hello! I\'m your FinSight AI assistant. I can help you understand your financial analysis, explain risks, and answer questions about your documents. How can I help you today?',
+      content: 'Hello! I\'m your FinSight AI assistant. I can help you understand your financial documents and answer questions. Please make sure you have uploaded a document first.',
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [documents, setDocuments] = useState([]);
+  const [selectedDoc, setSelectedDoc] = useState(null);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -20,24 +24,39 @@ export default function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  const getDummyResponse = (userMessage) => {
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('risk')) {
-      return 'Based on your document analysis, your overall risk score is 72/100, which indicates a medium risk level. The main risk factors identified are: Market Risk (High - 85%), Liquidity Risk (Medium - 65%), Operational Risk (Low - 40%), and Credit Risk (Low - 35%). I recommend focusing on mitigating the market risk through portfolio diversification.';
-    } else if (lowerMessage.includes('revenue') || lowerMessage.includes('profit')) {
-      return 'Your revenue analysis shows a positive trend! Current revenue is $2.5M with expenses at $1.8M, resulting in a healthy profit of $700K (28% profit margin). Revenue has grown 15% compared to last quarter. This is a strong performance indicator.';
-    } else if (lowerMessage.includes('recommendation') || lowerMessage.includes('suggest')) {
-      return 'Based on the analysis, here are my top recommendations:\n\n1. Diversify your investment portfolio to reduce market risk\n2. Improve operational efficiency - there\'s potential for 12% improvement\n3. Maintain current cash flow management - it\'s performing well\n4. Consider hedging strategies for market volatility\n5. Review credit risk policies quarterly';
-    } else if (lowerMessage.includes('cash flow') || lowerMessage.includes('liquidity')) {
-      return 'Your cash flow is currently stable with a positive trend. Liquidity risk is rated as Medium (65/100). You have adequate working capital, but I recommend maintaining a cash reserve equivalent to 3-6 months of operating expenses to improve this score.';
-    } else {
-      return 'That\'s a great question! Based on your financial document analysis, I can provide detailed insights about risk factors, revenue trends, profit margins, and recommendations. Could you be more specific about what aspect you\'d like to explore?';
+  // Fetch available documents on mount
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      if (!token) return;
+
+      const res = await axios.get('http://localhost:5000/query/documents', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.success && res.data.data?.documents) {
+        const docList = res.data.data.documents;
+        setDocuments(docList);
+        if (docList.length > 0 && !selectedDoc) {
+          setSelectedDoc(docList[0]); // Auto-select first document
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
     }
   };
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
+    if (!selectedDoc) {
+      alert('Please select a document first or upload one.');
+      return;
+    }
 
     const userMessage = {
       role: 'user',
@@ -49,15 +68,41 @@ export default function Chat() {
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
+    try {
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+      
+      const res = await axios.post(
+        'http://localhost:5000/query',
+        {
+          query: input,
+          document_id: selectedDoc,
+          top_k: 5
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
       const aiResponse = {
         role: 'assistant',
-        content: getDummyResponse(input),
+        content: res.data.data.answer || 'No answer found.',
+        source: res.data.data.source,
+        confidence: res.data.data.confidence,
+        citations: res.data.data.citations,
         timestamp: new Date(),
       };
+      
       setMessages((prev) => [...prev, aiResponse]);
+    } catch (error) {
+      const errorResponse = {
+        role: 'assistant',
+        content: `Error: ${error.response?.data?.error || error.message || 'Failed to get answer. Please try again.'}`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorResponse]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -68,10 +113,10 @@ export default function Chat() {
   };
 
   const quickQuestions = [
-    'What is my overall risk score?',
-    'Explain my revenue trends',
-    'What are your recommendations?',
-    'How is my cash flow?',
+    'Summarize the key points of this document',
+    'What are the main financial figures mentioned?',
+    'Are there any risk factors discussed?',
+    'What recommendations or conclusions are stated?',
   ];
 
   const handleQuickQuestion = (question) => {
@@ -88,15 +133,45 @@ export default function Chat() {
 
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-xl border-b border-white/20 px-6 py-5 shadow-lg relative z-10">
-        <div className="flex items-center space-x-4">
-          <div className="inline-flex items-center justify-center h-12 w-12 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl shadow-lg">
-            <span className="text-2xl">💬</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="inline-flex items-center justify-center h-12 w-12 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl shadow-lg">
+              <Send className="w-6 h-6 text-white rotate-90" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-cyan-600 bg-clip-text text-transparent">
+                AI Financial Assistant
+              </h1>
+              <p className="text-sm text-gray-600">Ask questions about your documents</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-cyan-600 bg-clip-text text-transparent">
-              AI Financial Assistant
-            </h1>
-            <p className="text-sm text-gray-600">Ask questions about your analysis</p>
+
+          {/* Document Selector */}
+          <div className="flex items-center space-x-3">
+            <label className="text-sm font-medium text-gray-700">Document:</label>
+            <select
+              value={selectedDoc || ''}
+              onChange={(e) => setSelectedDoc(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white cursor-pointer"
+              title={selectedDoc || 'Select a document'}
+            >
+              {documents.length === 0 ? (
+                <option value="">No documents indexed</option>
+              ) : (
+                documents.map((doc) => (
+                  <option key={doc} value={doc} title={doc}>
+                    {doc.split('_')[0].substring(0, 30)}...
+                  </option>
+                ))
+              )}
+            </select>
+            <button
+              onClick={fetchDocuments}
+              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+              title="Refresh documents"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </div>
@@ -109,36 +184,38 @@ export default function Chat() {
               key={index}
               className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fadeInUp`}
             >
-              <div
-                className={`max-w-[85%] rounded-2xl px-5 py-4 shadow-lg transition-all hover:shadow-xl ${
-                  message.role === 'user'
-                    ? 'bg-gradient-to-r from-indigo-700 to-cyan-600 text-white rounded-3xl rounded-tr-lg'
-                    : 'bg-white/80 backdrop-blur-xl border border-white/20 text-gray-900 rounded-3xl rounded-tl-lg'
-                }`}
-              >
-                <div className="flex items-start space-x-3">
-                  {message.role === 'assistant' && (
-                    <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 mt-0.5">
-                      🤖
+                <div
+                  className={`max-w-[85%] rounded-2xl px-5 py-4 shadow-lg transition-all hover:shadow-xl ${
+                    message.role === 'user'
+                      ? 'bg-gradient-to-r from-indigo-700 to-cyan-600 text-white rounded-3xl rounded-tr-lg'
+                      : 'bg-white/80 backdrop-blur-xl border border-white/20 text-gray-900 rounded-3xl rounded-tl-lg'
+                  }`}
+                >
+                  <div className="flex items-start space-x-3">
+                    {message.role === 'assistant' && (
+                      <div className="flex-shrink-0 w-8 h-8 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-full flex items-center justify-center text-white text-sm flex-shrink-0 mt-0.5">
+                        <Bot className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="whitespace-pre-line leading-relaxed text-sm md:text-base">{message.content}</p>
+
+                      <p
+                        className={`text-xs mt-2 ${
+                          message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'
+                        }`}
+                      >
+                        {message.timestamp.toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
                     </div>
-                  )}
-                  <div className="flex-1">
-                    <p className="whitespace-pre-line leading-relaxed text-sm md:text-base">{message.content}</p>
-                    <p
-                      className={`text-xs mt-2 ${
-                        message.role === 'user' ? 'text-indigo-200' : 'text-gray-500'
-                      }`}
-                    >
-                      {message.timestamp.toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
 
           {isTyping && (
             <div className="flex justify-start animate-fadeInUp">
@@ -157,13 +234,15 @@ export default function Chat() {
         {/* Quick Questions */}
         {messages.length <= 1 && (
           <div className="px-6 py-5 bg-white/50 backdrop-blur-sm border-t border-white/20">
-            <p className="text-sm font-semibold text-gray-700 mb-3">📌 Try asking:</p>
+            <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+              <Pin className="w-4 h-4 mr-2" /> Try asking:
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {quickQuestions.map((question, index) => (
                 <button
                   key={index}
                   onClick={() => handleQuickQuestion(question)}
-                  className="text-left px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:text-indigo-700"
+                  className="text-left px-4 py-3 bg-white border-2 border-gray-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 hover:shadow-md transition-all text-sm font-medium text-gray-700 hover:text-indigo-700 cursor-pointer"
                 >
                   {question}
                 </button>
@@ -189,7 +268,7 @@ export default function Chat() {
             <button
               onClick={handleSend}
               disabled={!input.trim() || isTyping}
-              className="bg-gradient-to-r from-indigo-700 to-cyan-600 text-white font-semibold px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 relative overflow-hidden group"
+              className="bg-gradient-to-r from-indigo-700 to-cyan-600 text-white font-semibold px-6 py-3 rounded-xl hover:shadow-lg transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 relative overflow-hidden group cursor-pointer"
             >
               <span className="relative z-10 flex items-center justify-center">
                 {isTyping ? (

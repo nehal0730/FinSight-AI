@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { Sparkles, Eye, EyeOff, Circle, Square } from 'lucide-react';
+
+const API_URL = 'http://localhost:5000';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -7,21 +11,45 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [adminSecret, setAdminSecret] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
+    setError('');
     
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
-    if (name && email && password) {
-      localStorage.setItem('user', name);
+    if (!name || !email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await axios.post(`${API_URL}/auth/register`, { 
+        name, 
+        email, 
+        password,
+        adminSecret: adminSecret || undefined
+      });
+      const { user, token } = res.data;
+      // Use sessionStorage for new signups by default
+      sessionStorage.setItem('authToken', token);
+      sessionStorage.setItem('user', JSON.stringify(user));
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('user');
       navigate('/upload');
-    } else {
-      alert('Please fill in all fields');
+    } catch (err) {
+      const msg = err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || 'Signup failed';
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -39,13 +67,15 @@ export default function Signup() {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center h-14 w-14 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-xl mb-4 shadow-lg">
-              <span className="text-2xl">⭐</span>
+              <Sparkles className="w-7 h-7 text-white" />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-cyan-600 bg-clip-text text-transparent mb-2">
               Create Account
             </h1>
             <p className="text-gray-600">Join FinSight AI and unlock AI-powered insights</p>
           </div>
+
+          {error && <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>}
 
           {/* Form */}
           <form onSubmit={handleSignup} className="space-y-4">
@@ -98,7 +128,7 @@ export default function Signup() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
                 >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                  {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                 </button>
               </div>
             </div>
@@ -118,6 +148,20 @@ export default function Signup() {
               />
             </div>
 
+            {/* Admin Secret Field (Optional) */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Admin Secret Key <span className="text-xs text-gray-500 font-normal">(Optional - Leave empty for regular user)</span>
+              </label>
+              <input
+                type="password"
+                value={adminSecret}
+                onChange={(e) => setAdminSecret(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all bg-white/50 backdrop-blur-sm placeholder-gray-400"
+                placeholder="Enter admin secret key if you have one"
+              />
+            </div>
+
             {/* Terms Checkbox */}
             <label className="flex items-start mt-4">
               <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-indigo-600 mt-1" required />
@@ -130,9 +174,10 @@ export default function Signup() {
             {/* Submit Button */}
             <button
               type="submit"
+              disabled={loading}
               className="w-full bg-gradient-to-r from-indigo-700 to-cyan-600 text-white font-semibold py-3 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-105 relative overflow-hidden group mt-6"
             >
-              <span className="relative z-10">Create Account</span>
+              <span className="relative z-10">{loading ? 'Creating account...' : 'Create Account'}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-indigo-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </button>
           </form>
@@ -147,10 +192,10 @@ export default function Signup() {
           {/* Social Buttons */}
           <div className="grid grid-cols-2 gap-3">
             <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors font-medium text-sm">
-              <span className="text-lg mr-2">🔵</span> Google
+              <Circle className="w-4 h-4 mr-2 text-blue-600 fill-blue-600" /> Google
             </button>
             <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors font-medium text-sm">
-              <span className="text-lg mr-2">🟦</span> Facebook
+              <Square className="w-4 h-4 mr-2 text-blue-700 fill-blue-700" /> Facebook
             </button>
           </div>
 

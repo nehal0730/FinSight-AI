@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pdfplumber
 
-from app.services.ocr_service import OCRService
+from app.services.document.ocr_service import OCRService
 
 
 @dataclass

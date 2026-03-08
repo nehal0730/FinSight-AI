@@ -16,10 +16,8 @@ from app.schemas.response_schema import (
     Statistics,
     Transaction,
 )
-from app.services.pdf_processor import PDFProcessor
-from app.services.pattern_detector import PatternDetector
-from app.services.text_cleaner import TextCleaner
-from app.services.text_store import TextStore
+from app.services.document import PDFProcessor, PatternDetector, TextCleaner, TextStore
+from app.services.fraud import RiskAnalysisService
 from app.utils.file_handler import FileHandler, FileValidator, MalwareScanService
 from app.utils.logging import (
     PerformanceTimer,
@@ -195,55 +193,41 @@ async def analyze_file(
         # FRAUD DETECTION - AI-powered transaction analysis
         fraud_detection_result = None
         try:
-            from app.services.transaction_extractor import TransactionExtractor
-            from app.services.feature_engineering import FeatureEngineer
-            from ml.predict import get_inference_engine
-            import numpy as np
-            
             with PerformanceTimer(api_logger, "Fraud detection"):
-                # Extract transactions from cleaned text
-                extractor = TransactionExtractor()
-                transactions = extractor.extract_transactions(cleaned_text)
-                
-                if transactions:
+                fraud_result = RiskAnalysisService.analyze_text(
+                    cleaned_text=cleaned_text,
+                    document_name=file.filename,
+                    document_insights={
+                        "pages": extracted.pages,
+                        "ocr_pages": extracted.ocr_pages_count,
+                    },
+                )
+
+                if fraud_result:
+                    transactions = fraud_result["transactions"]
                     api_logger.info(f"Extracted {len(transactions)} transactions for fraud analysis")
-                    
-                    # Engineer 28-D feature vector
-                    engineer = FeatureEngineer()
-                    features = engineer.engineer_features(transactions)
-                    basic_fraud_score = engineer.compute_fraud_score(features)
-                    
-                    # ML-powered anomaly detection
-                    features_array = np.array(list(features.values())).reshape(1, -1)
-                    inference = get_inference_engine()
-                    ml_result = inference.predict(features_array)
-                    
-                    # Identify high-risk features
-                    high_risk_features = []
-                    if features.get("high_risk_merchants", 0) > 0:
-                        high_risk_features.append("High-risk merchant detected")
-                    if features.get("txn_velocity_5min", 0) > 1:
-                        high_risk_features.append("Rapid transaction velocity")
-                    if features.get("amount_spike_ratio", 0) > 5:
-                        high_risk_features.append("Unusual spending spike")
-                    if features.get("large_debit_transactions", 0) > 0:
-                        high_risk_features.append("Large debit amounts")
-                    
+
                     fraud_detection_result = FraudDetection(
                         transactions_extracted=len(transactions),
                         transactions=[Transaction(**txn) for txn in transactions[:10]],  # First 10
-                        fraud_score=basic_fraud_score,
-                        anomaly_score=ml_result["anomaly_score"],
-                        is_fraud=ml_result["is_fraud"],
-                        risk_level=ml_result["risk_level"],
-                        high_risk_features=high_risk_features
+                        fraud_score=float(fraud_result["fraud_score"]),
+                        combined_score=float(fraud_result["combined_score"]),
+                        anomaly_score=float(fraud_result["anomaly_score"]),
+                        model_is_fraud=bool(fraud_result["model_is_fraud"]),
+                        ml_risk_level=str(fraud_result["model_risk_level"]),
+                        is_fraud=bool(fraud_result["is_fraud"]),
+                        final_risk_level=str(fraud_result["final_risk_level"]),
+                        high_risk_features=list(fraud_result["reasons"]),
                     )
-                    
+
                     api_logger.info(
                         "Fraud detection completed",
                         transactions=len(transactions),
-                        fraud_score=basic_fraud_score,
-                        ml_risk=ml_result["risk_level"]
+                        fraud_score=fraud_result["fraud_score"],
+                        combined_score=fraud_result["combined_score"],
+                        model_risk=fraud_result["model_risk_level"],
+                        hybrid_risk=fraud_result["hybrid_risk_level"],
+                        final_risk=fraud_result["final_risk_level"],
                     )
                 else:
                     api_logger.info("No transactions detected in document")

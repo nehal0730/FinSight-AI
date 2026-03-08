@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -60,9 +60,12 @@ class FraudDetection(BaseModel):
     transactions_extracted: int = Field(..., ge=0, description="Number of transactions found")
     transactions: List[Transaction] = Field(default=[], description="Parsed transaction records")
     fraud_score: float = Field(..., ge=0, le=100, description="Overall fraud risk score (0-100)")
+    combined_score: float = Field(..., ge=0, le=100, description="Hybrid score combining rule and model signals (0-100)")
     anomaly_score: float = Field(..., description="Isolation Forest anomaly score")
-    is_fraud: bool = Field(..., description="True if flagged as fraudulent")
-    risk_level: str = Field(..., description="Risk level: low, medium, high")
+    model_is_fraud: bool = Field(..., description="Raw model anomaly decision")
+    ml_risk_level: str = Field(..., description="Raw ML model risk level: low, medium, high")
+    is_fraud: bool = Field(..., description="Final hybrid fraud verdict")
+    final_risk_level: str = Field(..., description="Final hybrid risk level: low, medium, high")
     high_risk_features: List[str] = Field(default=[], description="Key fraud indicators detected")
 
 
@@ -179,3 +182,20 @@ class ExtractionResult(BaseModel):
     filename: str
     pages: int
     extracted_text: str
+
+
+class RiskAnalysisResponse(BaseModel):
+    """Focused response for /risk-analysis endpoint."""
+
+    risk_score: float = Field(..., ge=0, le=1, description="ML risk score (0-1)")
+    final_risk_level: str = Field(..., description="Final hybrid risk level: LOW, MEDIUM, HIGH")
+    reasons: List[str] = Field(default=[], description="Detected anomaly reasons")
+    transactions: List[Transaction] = Field(default=[], description="Parsed transaction records")
+    fraud_score: float = Field(..., ge=0, le=100, description="Rule-based fraud score (0-100)")
+    anomaly_score: float = Field(..., description="Raw anomaly score from model")
+    model_is_fraud: bool = Field(..., description="Raw model anomaly decision")
+    ml_risk_level: str = Field(..., description="Raw ML model risk level: low, medium, high")
+    is_fraud: bool = Field(..., description="Final hybrid fraud verdict")
+    combined_score: float = Field(..., ge=0, le=100, description="Hybrid score (0-100)")
+    transactions_extracted: int = Field(..., ge=0, description="Number of extracted transactions")
+    report: Dict[str, Any] = Field(..., description="Structured compliance report output")

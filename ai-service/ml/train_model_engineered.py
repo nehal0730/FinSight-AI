@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.services.feature_engineering import FeatureEngineer
+from app.services.fraud.feature_engineering import FeatureEngineer
 
 
 @dataclass

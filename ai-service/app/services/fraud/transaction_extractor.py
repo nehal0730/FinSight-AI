@@ -157,6 +157,10 @@ class TransactionExtractor:
             if amount_value is None:
                 continue
 
+            # Skip numbers that look like reference IDs (no decimals, > 8 digits)
+            if "." not in amount_text and len(amount_text.replace(",", "")) > 8:
+                continue
+
             has_currency = bool(re.search(r"₹|Rs\.?|INR|\$", match.group("full"), re.IGNORECASE))
             has_suffix = bool(match.group("suffix"))
             score = (2 if has_currency else 0) + (1 if has_suffix else 0)
@@ -165,8 +169,10 @@ class TransactionExtractor:
         if not scored:
             return None
 
-        # Use highest confidence; for ties prefer higher amount to avoid picking token IDs.
-        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        # Use highest confidence score first
+        # For ties, prefer SMALLER amounts (transaction amounts are typically smaller than balances)
+        # This avoids picking the balance column instead of the debit/credit column
+        scored.sort(key=lambda item: (-item[0], item[1]))
         return scored[0][2]
 
     @staticmethod
@@ -206,20 +212,39 @@ class TransactionExtractor:
         trailing = line[amount_match.end():].strip(" -:|,./")
         between = line[date_match.end():amount_match.start()].strip(" -:|,./")
 
-        base = trailing if trailing else between
-        if not base:
+        # Strategy: Extract merchant from both positions, then pick the better one
+        
+        # Check if trailing looks like a balance number
+        trailing_has_balance = bool(trailing and re.match(r'^\d+[\d,\.]+\s*$', trailing))
+        
+        # Try extracting from both positions
+        between_merchant = cls._clean_merchant_text(between) if between else ""
+        trailing_merchant = cls._clean_merchant_text(trailing) if trailing and not trailing_has_balance else ""
+        
+        # Decision: Prefer the one with actual content after cleaning
+        if trailing_merchant and not trailing_has_balance:
+            # Use trailing if it has merchant name and no balance
+            return trailing_merchant if trailing_merchant else "UNKNOWN"
+        elif between_merchant:
+            # Use between (description column) as fallback
+            return between_merchant if between_merchant else "UNKNOWN"
+        else:
             return "UNKNOWN"
-
-        # Keep business-like tokens, drop common statement boilerplate.
-        tokens = re.findall(r"[A-Za-z0-9_&./-]+", base)
+    
+    @classmethod
+    def _clean_merchant_text(cls, text: str) -> str:
+        """Extract clean merchant name from text by removing boilerplate tokens."""
+        if not text:
+            return ""
+        
+        tokens = re.findall(r"[A-Za-z0-9_&./-]+", text)
         cleaned_tokens = [
             token
             for token in tokens
             if token.lower() not in cls.NOISE_TOKENS and not token.isdigit()
         ]
-
-        merchant = " ".join(cleaned_tokens).strip()
-        return merchant if merchant else "UNKNOWN"
+        
+        return " ".join(cleaned_tokens).strip()
 
     @staticmethod
     def _normalize_date(raw_date: str) -> Optional[str]:

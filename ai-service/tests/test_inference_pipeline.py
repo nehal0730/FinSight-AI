@@ -8,8 +8,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.services.transaction_extractor import TransactionExtractor
-from app.services.feature_engineering import FeatureEngineer
+from app.services.fraud import TransactionExtractor, FeatureEngineer
 from ml.predict import get_inference_engine
 
 

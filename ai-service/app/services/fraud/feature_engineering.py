@@ -42,6 +42,26 @@ class FeatureEngineer:
         "groceries",
         "pharmacy",
         "supermarket",
+        "amazon",
+        "amzn",
+        "flipkart",
+        "uber",
+        "swiggy",
+        "zomato",
+        "netflix",
+        "spotify",
+        "google",
+        "apple",
+        "microsoft",
+        "restaurant",
+        "food",
+        "petrol",
+        "gas",
+        "electricity",
+        "water",
+        "internet",
+        "mobile",
+        "phone",
     }
 
     @classmethod
@@ -312,15 +332,31 @@ class FeatureEngineer:
 
     @classmethod
     def _is_high_risk_merchant(cls, merchant: str) -> bool:
-        """Check if merchant name matches high-risk patterns."""
+        """Check if merchant name matches high-risk patterns.
+        
+        Matches patterns at word boundaries or at start of compound words,
+        but NOT in the middle of words (e.g., "casino" matches "CasinoXYZ" 
+        but "atm" does NOT match "AMZN").
+        """
         merchant_lower = merchant.lower()
-        return any(pattern in merchant_lower for pattern in cls.HIGH_RISK_PATTERNS)
+        return any(
+            # Match at word boundary or at the start of a word (including compound words)
+            re.search(rf'\b{re.escape(pattern)}', merchant_lower)
+            for pattern in cls.HIGH_RISK_PATTERNS
+        )
 
     @classmethod
     def _is_legitimate_merchant(cls, merchant: str) -> bool:
-        """Check if merchant name matches legitimate patterns."""
+        """Check if merchant name matches legitimate patterns.
+        
+        Matches patterns at word boundaries or at start of compound words.
+        """
         merchant_lower = merchant.lower()
-        return any(pattern in merchant_lower for pattern in cls.LEGITIMATE_PATTERNS)
+        return any(
+            # Match at word boundary or at the start of a word
+            re.search(rf'\b{re.escape(pattern)}', merchant_lower)
+            for pattern in cls.LEGITIMATE_PATTERNS
+        )
 
     @staticmethod
     def _count_rapid_repeats(merchants: list[str], window: int = 3) -> int:
@@ -370,60 +406,63 @@ class FeatureEngineer:
     @classmethod
     def compute_fraud_score(cls, features: dict[str, float]) -> float:
         """
-        Compute a simple fraud risk score (0-100) from features.
+        Compute a balanced fraud risk score (0-100) from features.
 
-        Reasoning:
-        - High-risk merchants: +5 points each
-        - Large debit transactions: +2 points each
-        - Rapid repeats: +3 points each
-        - Cash-like activity: +1.5 points each
-        - High velocity (5min): +4 points per transaction
-        - High velocity (1hour): +1 point per transaction
-        - Spending spike: +2 points per spike ratio unit above 10
-        - High std dev (volatile): +0.01 per unit of std dev
-        - Legitimate merchants: -3 points each
+        Reasoning (adjusted for real-world variance):
+        - High-risk merchants: +10 points each (strong signal)
+        - Large debit transactions: +1 point each (context-dependent)
+        - Rapid repeats: +5 points each (suspicious pattern)
+        - Cash-like activity: +1 point each (moderate risk)
+        - High velocity (5min): +8 points per transaction (very suspicious)
+        - High velocity (1hour): +2 points per transaction
+        - Spending spike: +1 point per 5x spike (scaled down)
+        - High std dev: +0.0001 per unit (drastically reduced - large amounts are normal)
+        - Z-score outliers: +2 per std dev above 3 (reduced sensitivity)
+        - Avg daily transactions: +1 per day above 15 (reduced threshold)
+        - Legitimate merchants: -5 points each (strong positive signal)
 
         Returns:
-            Float between 0 (low risk) and 100+ (high risk)
+            Float between 0 (low risk) and 100 (high risk)
         """
         score = 0.0
 
-        # High-risk merchant activity
-        score += features.get("high_risk_merchants", 0) * 5.0
+        # High-risk merchant activity (strongest signal)
+        score += features.get("high_risk_merchants", 0) * 10.0
 
-        # Large suspicious debits
-        score += features.get("large_debit_transactions", 0) * 2.0
+        # Large suspicious debits (reduced weight - large amounts can be legitimate)
+        score += features.get("large_debit_transactions", 0) * 1.0
 
-        # Rapid repeated merchants
-        score += features.get("rapid_same_merchant_transactions", 0) * 3.0
+        # Rapid repeated merchants (strong fraud signal)
+        score += features.get("rapid_same_merchant_transactions", 0) * 5.0
 
         # Cash-like activity
-        score += features.get("cash_like_activity", 0) * 1.5
+        score += features.get("cash_like_activity", 0) * 1.0
 
-        # Transaction velocity (high frequency suspicious)
-        score += features.get("txn_velocity_5min", 0) * 4.0  # Very high weight
-        score += features.get("txn_velocity_1hour", 0) * 1.0
+        # Transaction velocity (strong fraud signal)
+        score += features.get("txn_velocity_5min", 0) * 8.0
+        score += features.get("txn_velocity_1hour", 0) * 2.0
 
-        # Spending spikes (large sudden amounts)
+        # Spending spikes (scaled down - large legitimate purchases exist)
         spike_ratio = features.get("amount_spike_ratio", 0)
-        if spike_ratio > 10.0:
-            score += (spike_ratio - 10.0) * 2.0  # Penalize spikes above 10x
+        if spike_ratio > 20.0:
+            score += (spike_ratio - 20.0) * 0.5  # Only penalize extreme spikes
 
-        # Transaction volatility (high std dev = unusual pattern)
-        score += features.get("transaction_std_dev", 0) * 0.01
+        # Transaction volatility (DRASTICALLY reduced - high-value accounts have high std_dev)
+        score += features.get("transaction_std_dev", 0) * 0.0001
 
-        # High transaction frequency per day (fraud often increases activity)
+        # High transaction frequency per day (moderate signal)
         avg_daily = features.get("avg_txn_per_day", 0)
-        if avg_daily > 10.0:
-            score += (avg_daily - 10.0) * 1.5  # Penalize >10 transactions/day
+        if avg_daily > 15.0:
+            score += (avg_daily - 15.0) * 1.0
 
-        # Z-score outliers (transactions much larger than normal)
+        # Z-score outliers (reduced - one large transaction isn't fraud)
         zscore = features.get("max_amount_zscore", 0)
         if zscore > 3.0:
-            score += (zscore - 3.0) * 3.0  # Strong penalty for >3 std devs
+            score += (zscore - 3.0) * 2.0  # Reduced from 3.0 to 2.0
 
-        # Penalize legitimate patterns
-        score -= min(features.get("legitimate_merchants", 0) * 3.0, 20.0)
+        # Reward legitimate patterns (stronger negative signal)
+        score -= min(features.get("legitimate_merchants", 0) * 5.0, 30.0)
 
         # Normalize to 0-100
         return max(0.0, min(100.0, score))
+

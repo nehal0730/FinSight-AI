@@ -1,5 +1,5 @@
 import unittest
-from app.services.feature_engineering import FeatureEngineer
+from app.services.fraud import FeatureEngineer, FraudDetector
 
 
 class FeatureEngineeringTests(unittest.TestCase):
@@ -129,6 +129,29 @@ class FeatureEngineeringTests(unittest.TestCase):
             "unique_merchants",
         }
         assert expected_keys.issubset(set(features.keys()))
+
+    def test_hybrid_verdict_uses_both_signals(self):
+        """Hybrid verdict should elevate risk when both signals are moderately suspicious."""
+        result = FraudDetector.combine_fraud_verdict(
+            fraud_score=30.0,
+            anomaly_score=0.63,
+            model_is_fraud=False,
+        )
+
+        assert result["combined_score"] > 0
+        assert result["is_fraud"] is True
+        assert result["risk_level"] == "high"
+
+    def test_hybrid_verdict_low_when_both_low(self):
+        """Hybrid verdict should stay low for clearly normal behavior."""
+        result = FraudDetector.combine_fraud_verdict(
+            fraud_score=6.0,
+            anomaly_score=0.18,
+            model_is_fraud=False,
+        )
+
+        assert result["is_fraud"] is False
+        assert result["risk_level"] == "low"
 
 
 if __name__ == "__main__":

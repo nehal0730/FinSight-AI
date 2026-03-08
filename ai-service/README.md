@@ -1,20 +1,21 @@
 # FinSight AI Service
 
-FastAPI service for PDF analysis + RAG indexing/query.
+FastAPI service for PDF analysis, fraud risk scoring, and RAG query.
 
-## What it does
+## API
 
-- `POST /analyze`: extract + clean PDF text and index it for retrieval
-- `POST /query/query`: answer document-specific questions
-- `GET /query/documents`: list indexed document IDs
-- `GET /health`: health check
+- `POST /analyze` - full PDF analysis + indexing + fraud section
+- `POST /risk-analysis` - focused fraud/risk pipeline with report output
+- `POST /query/query` - ask questions over indexed documents
+- `GET /query/documents` - list indexed document IDs
+- `GET /health` - service health
 
-## Setup
+## Quick Start
 
 ```bash
 cd ai-service
 python -m venv .venv
-.venv\Scripts\activate   # Windows
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -30,16 +31,4 @@ Run:
 uvicorn app.main:app --reload --port 8000
 ```
 
-Docs: `http://localhost:8000/docs`
-
-## Notes
-
-- Uses HuggingFace embeddings + FAISS vector store (local)
-- Uses Groq for answer generation
-- Optional developer scripts in `scripts/`:
-  - `example_rag_workflow.py` (smoke test)
-  - `evaluate_retrieval.py` (retrieval metrics)
-
-These scripts are not required for runtime.
-
-MIT
+Swagger: `http://localhost:8000/docs`

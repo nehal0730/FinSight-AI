@@ -156,7 +156,7 @@ class RAGConfigPresets:
         config.chunking = ChunkingConfig(chunk_size=500, chunk_overlap=200)
         config.embedding = EmbeddingConfig(model=EmbeddingModel.HUGGINGFACE_MPNET)
         config.retrieval = RetrievalConfig(top_k=5, similarity_threshold=0.35)
-        config.llm = LLMConfig(provider="groq", model="llama-3.1-8b-instant", temperature=0.0)
+        config.llm = LLMConfig(provider="groq", model="llama-3.1-8b-instant", temperature=0.3, max_tokens=1500)
         return config
     
     @staticmethod

@@ -14,3 +14,9 @@ langchain-community>=0.0.10
 groq>=0.4.0
 sentence-transformers>=2.2.0
 torch>=2.0.0
+
+# Fraud Detection ML Dependencies
+scikit-learn>=1.5.0
+joblib>=1.4.0
+pandas>=2.2.0
+matplotlib>=3.7.0

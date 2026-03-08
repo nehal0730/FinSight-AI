@@ -47,6 +47,25 @@ class ComplianceFlags(BaseModel):
     risk_level: str = Field(..., description="Risk assessment: low, medium, high")
 
 
+class Transaction(BaseModel):
+    """Individual transaction record"""
+    date: str = Field(..., description="Transaction date")
+    amount: float = Field(..., ge=0, description="Transaction amount")
+    type: str = Field(..., description="Transaction type: debit or credit")
+    merchant: str = Field(..., description="Merchant or description")
+
+
+class FraudDetection(BaseModel):
+    """AI fraud detection results using Isolation Forest"""
+    transactions_extracted: int = Field(..., ge=0, description="Number of transactions found")
+    transactions: List[Transaction] = Field(default=[], description="Parsed transaction records")
+    fraud_score: float = Field(..., ge=0, le=100, description="Overall fraud risk score (0-100)")
+    anomaly_score: float = Field(..., description="Isolation Forest anomaly score")
+    is_fraud: bool = Field(..., description="True if flagged as fraudulent")
+    risk_level: str = Field(..., description="Risk level: low, medium, high")
+    high_risk_features: List[str] = Field(default=[], description="Key fraud indicators detected")
+
+
 class ProcessingMetrics(BaseModel):
     """Internal processing metrics"""
     ocr_pages_processed: int = Field(..., ge=0, description="Number of pages that required OCR")
@@ -77,6 +96,9 @@ class AnalyzeResponse(BaseModel):
     
     # Compliance and risk
     compliance_flags: ComplianceFlags
+    
+    # Fraud detection (AI-powered)
+    fraud_detection: Optional[FraudDetection] = Field(None, description="AI fraud detection results")
     
     # Processing metrics
     processing_metrics: ProcessingMetrics

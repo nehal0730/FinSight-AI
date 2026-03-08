@@ -85,7 +85,7 @@ A:
     @staticmethod
     def build_system_message() -> str:
         """Get system message with anti-hallucination constraints."""
-        return PromptEngine.SYSTEM_PROMPT
+        return PromptEngine.SYSTEM_PROMPT + "\n\n" + PromptEngine.FINANCIAL_QA_EXAMPLES
 
     @staticmethod
     def build_user_message(context: PromptContext) -> str:

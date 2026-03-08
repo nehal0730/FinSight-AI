@@ -10,9 +10,11 @@ from app.schemas.response_schema import (
     ComplianceFlags,
     DocumentMetadata,
     FinancialSignals,
+    FraudDetection,
     ProcessingMetrics,
     SecurityValidation,
     Statistics,
+    Transaction,
 )
 from app.services.pdf_processor import PDFProcessor
 from app.services.pattern_detector import PatternDetector
@@ -190,6 +192,65 @@ async def analyze_file(
                 risk_level=risk_level
             )
 
+        # FRAUD DETECTION - AI-powered transaction analysis
+        fraud_detection_result = None
+        try:
+            from app.services.transaction_extractor import TransactionExtractor
+            from app.services.feature_engineering import FeatureEngineer
+            from ml.predict import get_inference_engine
+            import numpy as np
+            
+            with PerformanceTimer(api_logger, "Fraud detection"):
+                # Extract transactions from cleaned text
+                extractor = TransactionExtractor()
+                transactions = extractor.extract_transactions(cleaned_text)
+                
+                if transactions:
+                    api_logger.info(f"Extracted {len(transactions)} transactions for fraud analysis")
+                    
+                    # Engineer 28-D feature vector
+                    engineer = FeatureEngineer()
+                    features = engineer.engineer_features(transactions)
+                    basic_fraud_score = engineer.compute_fraud_score(features)
+                    
+                    # ML-powered anomaly detection
+                    features_array = np.array(list(features.values())).reshape(1, -1)
+                    inference = get_inference_engine()
+                    ml_result = inference.predict(features_array)
+                    
+                    # Identify high-risk features
+                    high_risk_features = []
+                    if features.get("high_risk_merchants", 0) > 0:
+                        high_risk_features.append("High-risk merchant detected")
+                    if features.get("txn_velocity_5min", 0) > 1:
+                        high_risk_features.append("Rapid transaction velocity")
+                    if features.get("amount_spike_ratio", 0) > 5:
+                        high_risk_features.append("Unusual spending spike")
+                    if features.get("large_debit_transactions", 0) > 0:
+                        high_risk_features.append("Large debit amounts")
+                    
+                    fraud_detection_result = FraudDetection(
+                        transactions_extracted=len(transactions),
+                        transactions=[Transaction(**txn) for txn in transactions[:10]],  # First 10
+                        fraud_score=basic_fraud_score,
+                        anomaly_score=ml_result["anomaly_score"],
+                        is_fraud=ml_result["is_fraud"],
+                        risk_level=ml_result["risk_level"],
+                        high_risk_features=high_risk_features
+                    )
+                    
+                    api_logger.info(
+                        "Fraud detection completed",
+                        transactions=len(transactions),
+                        fraud_score=basic_fraud_score,
+                        ml_risk=ml_result["risk_level"]
+                    )
+                else:
+                    api_logger.info("No transactions detected in document")
+        except Exception as fraud_error:
+            # Non-fatal: continue analysis even if fraud detection fails
+            api_logger.error(f"Fraud detection failed (non-fatal): {fraud_error}")
+
         # STATISTICS CALCULATION       
         word_count = TextCleaner.word_count(cleaned_text)
         character_count = len(cleaned_text)
@@ -274,6 +335,7 @@ async def analyze_file(
                 contains_sensitive_data=contains_sensitive,
                 risk_level=risk_level,
             ),
+            fraud_detection=fraud_detection_result,
             processing_metrics=ProcessingMetrics(
                 ocr_pages_processed=extracted.ocr_pages_count,
                 ocr_used=extracted.ocr_pages_count > 0,

@@ -102,3 +102,30 @@ Thumbs.db
 .cache/
 .parcel-cache/
 *.local
+
+# =============================================================================
+# ML Models & Data
+# =============================================================================
+# Trained models (typically too large for git)
+*.pkl
+*.h5
+*.pth
+*.ckpt
+*.joblib
+ai-service/models/*.pkl
+ai-service/models/*.h5
+ai-service/models/*.pth
+
+# Data files (can be large, may contain sensitive info)
+ai-service/data/*.csv
+ai-service/data/*.json
+ai-service/data/*.parquet
+!ai-service/data/README.md
+
+# Generated reports and plots
+ai-service/reports/
+reports/plots/
+*.png
+*.jpg
+*.jpeg
+*.pdf

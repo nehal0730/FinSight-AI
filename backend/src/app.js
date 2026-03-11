@@ -6,6 +6,7 @@ const uploadRoutes = require("./routes/upload");
 const healthRoutes = require("./routes/health");
 const authRoutes = require("./routes/auth");
 const queryRoutes = require("./routes/query");
+const riskAnalysisRoutes = require("./routes/risk-analysis");
 const errorHandler = require("./middleware/error");
 const requestLogger = require("./middleware/request");
 
@@ -19,6 +20,7 @@ app.use(requestLogger);
 app.use("/auth", authRoutes);
 app.use("/upload", uploadRoutes);
 app.use("/query", queryRoutes);
+app.use("/risk-analysis", riskAnalysisRoutes);
 app.use("/health", healthRoutes);
 
 app.use(errorHandler);

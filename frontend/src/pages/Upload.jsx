@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { FileText, Zap, Lock, BarChart3, AlertTriangle, CheckCircle, Search } from 'lucide-react';
+import { FileText, Zap, Lock, BarChart3, AlertTriangle, CheckCircle, Search, Sparkles } from 'lucide-react';
+import { buildRiskRecord, saveRiskAnalysis } from '../utils/riskStorage';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const AI_BASE_URL = import.meta.env.VITE_AI_URL || 'http://localhost:8000';
 
 export default function Upload() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [useLLM, setUseLLM] = useState(false);
   const navigate = useNavigate();
 
   const handleFileChange = (e) => {
@@ -55,26 +60,26 @@ export default function Upload() {
         });
       }, 200);
 
-      try {
-        const res = await axios.post('http://localhost:5000/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        localStorage.setItem('analysisResult', JSON.stringify(res.data));
-      } catch (apiErr) {
-        const status = apiErr?.response?.status;
-        if (status === 401) {
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('user');
-          alert('Session expired or invalid. Please login again.');
-          navigate('/login');
-          return;
-        }
-        console.warn('Backend unavailable, using dummy data', apiErr);
-        localStorage.setItem('analysisResult', JSON.stringify(getDummyAnalysisData()));
-      }
+      const uploadPromise = axios.post(`${API_BASE_URL}/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const riskFormData = new FormData();
+      riskFormData.append('file', file);
+      riskFormData.append('use_llm', useLLM.toString());
+      const riskPromise = axios.post(`${AI_BASE_URL}/risk-analysis`, riskFormData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const [uploadRes, riskRes] = await Promise.all([uploadPromise, riskPromise]);
+      localStorage.setItem('analysisResult', JSON.stringify(uploadRes.data));
+      const riskRecord = buildRiskRecord(file, riskRes.data, uploadRes.data);
+      await saveRiskAnalysis(riskRecord);
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -84,36 +89,20 @@ export default function Upload() {
       }, 500);
     } catch (err) {
       console.error(err);
-      alert('Upload failed. Please try again.');
+      const status = err?.response?.status;
+      if (status === 401) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        alert('Session expired or invalid. Please login again.');
+        navigate('/login');
+        return;
+      }
+      alert('Upload or risk analysis failed. Please try again.');
       setProgress(0);
     } finally {
       setUploading(false);
     }
   };
-
-  const getDummyAnalysisData = () => ({
-    riskScore: 72,
-    fileName: file.name || 'financial_report.pdf',
-    uploadDate: new Date().toLocaleDateString(),
-    metrics: {
-      revenue: '$2.5M',
-      expenses: '$1.8M',
-      profit: '$700K',
-      profitMargin: '28%',
-    },
-    riskFactors: [
-      { name: 'Liquidity Risk', level: 'Medium', score: 65 },
-      { name: 'Credit Risk', level: 'Low', score: 35 },
-      { name: 'Market Risk', level: 'High', score: 85 },
-      { name: 'Operational Risk', level: 'Low', score: 40 },
-    ],
-    insights: [
-      'Revenue has increased by 15% compared to last quarter',
-      'Cash flow is stable with positive trend',
-      'Consider diversifying investment portfolio to reduce market risk',
-      'Operational efficiency can be improved by 12%',
-    ],
-  });
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -222,7 +211,7 @@ export default function Upload() {
               </div>
               <button
                 onClick={() => setFile(null)}
-                className="text-indigo-600 hover:text-indigo-700 hover:bg-white rounded-lg p-2 transition-all"
+                className="text-indigo-600 hover:text-indigo-700 hover:bg-white rounded-lg p-2 transition-all cursor-pointer"
               >
                 ✕
               </button>
@@ -247,6 +236,32 @@ export default function Upload() {
               <p className="text-xs text-gray-500 mt-2">Processing your financial document with AI...</p>
             </div>
           )}
+
+          {/* AI Summary Toggle */}
+          <div className="mt-6 p-5 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-indigo-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">AI-Powered Summary</p>
+                <p className="text-xs text-gray-500">Generate LLM-based natural language fraud summary & recommendation</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUseLLM(!useLLM)}
+              className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 cursor-pointer ${
+                useLLM ? 'bg-indigo-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${
+                  useLLM ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
 
           {/* Upload Button */}
           <button

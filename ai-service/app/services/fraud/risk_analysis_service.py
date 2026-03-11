@@ -27,6 +27,7 @@ class RiskAnalysisService:
         cleaned_text: str,
         document_name: str | None = None,
         document_insights: dict[str, Any] | None = None,
+        use_llm: bool = False,
     ) -> dict[str, Any] | None:
         """Analyze cleaned text and return fraud, explanation, and report outputs.
 
@@ -61,6 +62,7 @@ class RiskAnalysisService:
             transactions=transactions,
             document_name=document_name,
             document_insights=document_insights,
+            use_llm=use_llm,
         )
 
         final_risk_level = str(report.get("risk_level", "LOW"))

@@ -2,7 +2,7 @@
 Financial Risk Report Generator
 
 Generates structured compliance reports combining ML risk scores,
-anomaly explanations, and document insights.
+anomaly explanations, and document insights with optional LLM enhancement.
 
 Author: FinSight AI
 """
@@ -30,6 +30,7 @@ class ReportGenerator:
         transactions: list[dict[str, Any]],
         document_name: Optional[str] = None,
         document_insights: Optional[dict[str, Any]] = None,
+        use_llm: bool = False,
     ) -> dict[str, Any]:
         """Generate comprehensive financial compliance report.
 
@@ -41,6 +42,7 @@ class ReportGenerator:
             transactions: List of transaction dictionaries
             document_name: Name of analyzed document
             document_insights: Additional document metadata
+            use_llm: If True, use LLM to generate natural language summary and recommendation
 
         Returns:
             Structured report dictionary with:
@@ -49,6 +51,7 @@ class ReportGenerator:
             - detected_issues (list of issues)
             - key_metrics (transaction summary)
             - recommendation
+            - llm_summary (only if use_llm=True)
             - formatted_report (human-readable text)
         """
         # Generate unique report ID
@@ -64,8 +67,37 @@ class ReportGenerator:
         # Extract key metrics
         key_metrics = cls._extract_key_metrics(features, transactions)
 
-        # Generate recommendation
+        # Generate recommendation (rule-based by default)
         recommendation = cls._generate_recommendation(risk_score, is_fraud, detected_issues)
+        
+        # LLM Enhancement (optional)
+        llm_summary = None
+        llm_recommendation = None
+        if use_llm:
+            try:
+                from app.services.fraud.llm_report_generator import get_llm_report_generator
+                llm_gen = get_llm_report_generator()
+                
+                llm_summary = llm_gen.generate_fraud_summary(
+                    risk_score=risk_score,
+                    is_fraud=is_fraud,
+                    detected_issues=detected_issues,
+                    key_metrics=key_metrics,
+                    document_name=document_name or "Unknown Document"
+                )
+                
+                llm_recommendation = llm_gen.generate_recommendation(
+                    risk_score=risk_score,
+                    is_fraud=is_fraud,
+                    detected_issues=detected_issues
+                )
+                
+                # Override rule-based recommendation with LLM version
+                recommendation = llm_recommendation
+                
+            except Exception as e:
+                from app.utils.logging import api_logger
+                api_logger.warning(f"LLM report generation failed, using rule-based: {e}")
 
         # Build structured report
         report = {
@@ -80,6 +112,10 @@ class ReportGenerator:
             "key_metrics": key_metrics,
             "recommendation": recommendation,
         }
+        
+        # Add LLM-generated content if available
+        if llm_summary:
+            report["llm_summary"] = llm_summary
 
         # Add document insights if provided
         if document_insights:

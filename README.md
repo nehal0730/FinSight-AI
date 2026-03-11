@@ -1,12 +1,21 @@
 # FinSight AI
 
-Full-stack financial document analysis platform with authentication, PDF upload, RAG indexing, and chat-based Q&A.
+Full-stack financial document analysis platform with authentication, PDF upload, RAG indexing, chat-based Q&A, fraud detection, and risk analysis.
 
 ## Stack
 
-- Frontend: React + Vite (`frontend`, port `5173`)
-- Backend: Node.js + Express + MongoDB (`backend`, port `5000`)
-- AI Service: FastAPI + FAISS + HuggingFace + Groq (`ai-service`, port `8000`)
+- **Frontend:** React 19 + Vite + Tailwind CSS (`frontend`, port `5173`)
+- **Backend:** Node.js + Express + MongoDB (`backend`, port `5000`)
+- **AI Service:** FastAPI + FAISS + HuggingFace + Groq (`ai-service`, port `8000`)
+
+## Core Features
+
+- **Document Upload & Chat** — Upload PDFs, auto-index via RAG, query documents through chat
+- **Fraud Detection** — ML-based fraud classification on transaction data (CSV or PDF-extracted)
+- **Risk Analysis** — End-to-end pipeline: PDF → transaction extraction → feature engineering → fraud scoring → risk explanation
+- **Reports & Dashboards** — Visual risk analysis dashboards with charts and detailed reports
+- **Role-Based Access** — Admin sees all documents; users see only their own uploads
+- **Auth** — JWT-based signup/login with optional admin secret and "Remember Me" persistence
 
 ## Core Flow
 
@@ -14,8 +23,10 @@ Full-stack financial document analysis platform with authentication, PDF upload,
 2. User uploads PDF
 3. AI service extracts + indexes document for RAG
 4. Chat queries retrieve only allowed documents
-	 - admin: all docs
-	 - user: only own uploads
+   - admin: all docs
+   - user: only own uploads
+5. Risk analysis can be triggered on uploaded financial PDFs
+6. Fraud detection reports are generated with ML predictions and explanations
 
 ## Prerequisites
 
@@ -83,12 +94,51 @@ npm run dev
 
 ## Useful Endpoints
 
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /upload`
-- `GET /query/documents`
-- `POST /query`
-- `GET http://localhost:8000/docs` (AI service Swagger)
+### Backend (Express)
+
+- `POST /auth/register` — Register user (optional `adminSecret` for admin role)
+- `POST /auth/login` — Authenticate user
+- `POST /upload` — Upload PDF for processing
+- `GET /query/documents` — List documents (role-filtered)
+- `POST /query` — Query documents via RAG
+- `POST /risk-analysis` — Trigger risk analysis pipeline
+- `GET /health` — Health check
+
+### AI Service (FastAPI)
+
+- `POST /analyze` — Comprehensive PDF analysis (patterns, compliance, financial signals)
+- `POST /risk-analysis` — PDF → transaction extraction → fraud detection → risk report
+- `POST /fraud-detection` — Standalone CSV fraud detection
+- `POST /query` — RAG document query
+- `GET /query` — List indexed documents
+- `GET /docs` — Swagger UI (`http://localhost:8000/docs`)
+
+## AI Service Architecture
+
+### Document Processing
+- PDF extraction and parsing with OCR support
+- Text cleaning, chunking, and pattern detection
+- Financial signal and compliance flag identification
+
+### RAG System
+- FAISS vector database with `all-mpnet-base-v2` embeddings
+- Semantic search with role-based document filtering
+- Groq LLM for answer generation
+
+### Fraud Detection Pipeline
+- Transaction extraction from PDFs
+- Feature engineering (time-based, amount-based, velocity features)
+- ML classification with interpretable risk explanations
+- LLM-enhanced report generation via Groq
+
+### ML Model Training
+- Training scripts in `ai-service/ml/`
+- `train_model.py` — Base model training
+- `train_model_engineered.py` — Training with engineered features
+- Feature spec: `ai-service/models/feature_names_engineered.json`
+
+### Tests
+- `ai-service/tests/` — Unit tests for transaction extraction, feature engineering, inference, risk explanation, and report generation
 
 ## Notes
 

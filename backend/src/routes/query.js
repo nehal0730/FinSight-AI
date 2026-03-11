@@ -88,26 +88,37 @@ router.get("/documents", auth, async (req, res, next) => {
     if (req.user.role === 'admin') {
       // Admin: Fetch all documents from MongoDB
       logger.info(`👑 ADMIN DETECTED - Fetching ALL documents from MongoDB`);
-      userDocuments = await Document.find({}, 'documentId fileName uploaded_at');
+      userDocuments = await Document.find({}, 'documentId fileName uploaded_at filePath fileSize');
       logger.info(`✓ Found ${userDocuments.length} TOTAL documents in MongoDB`);
     } else {
       // Regular user: Fetch only their own documents from MongoDB
       logger.info(`👤 Regular user - Fetching only own documents`);
       userDocuments = await Document.find(
         { userId: req.user.id }, 
-        'documentId fileName uploaded_at'
+        'documentId fileName uploaded_at filePath fileSize'
       );
       logger.info(`✓ Found ${userDocuments.length} documents for this user`);
     }
 
-    // Return just the document IDs for the Chat page
+    // Return just the document IDs for the Chat page (backward compatibility)
     const documentIds = userDocuments.map(doc => doc.documentId);
+    
+    // Also return full document data for dashboard usage
+    const documentsWithMetadata = userDocuments.map(doc => ({
+      documentId: doc.documentId,
+      fileName: doc.fileName,
+      uploadedAt: doc.uploaded_at,
+      fileSize: doc.fileSize,
+      hasPdf: !!doc.filePath
+    }));
+    
     logger.info(`✓ Returning ${documentIds.length} document IDs`);
 
     res.status(200).json({
       success: true,
       data: {
-        documents: documentIds
+        documents: documentIds,
+        documentsWithMetadata: documentsWithMetadata
       },
       error: null
     });

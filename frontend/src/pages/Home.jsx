@@ -1,7 +1,23 @@
 import { Link } from 'react-router-dom';
 import { Rocket, Bot, Shield, MessageCircle, BarChart3, FileText, Search, Sparkles } from 'lucide-react';
+import { getRiskHistory } from '../utils/riskStorage';
+import { useState, useEffect } from 'react';
 
 export default function Home() {
+  const [docCount, setDocCount] = useState(0);
+  const [avgAccuracy, setAvgAccuracy] = useState(99);
+
+  useEffect(() => {
+    getRiskHistory().then(history => {
+      setDocCount(history.length);
+      if (history.length > 0) {
+        setAvgAccuracy(
+          Math.round(history.reduce((s, r) => s + (100 - Number(r?.riskResponse?.combined_score || 0)), 0) / history.length)
+        );
+      }
+    });
+  }, []);
+
   const features = [
     {
       title: 'AI-Powered Analysis',
@@ -62,7 +78,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 animate-fadeInUp delay-300">
             <Link 
               to="/signup" 
-              className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-indigo-700 to-cyan-600 rounded-xl overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+              className="group relative inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-white bg-gradient-to-r from-indigo-700 to-cyan-600 rounded-xl overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer"
             >
               <span className="relative z-10 flex items-center">
                 Get Started Free
@@ -75,7 +91,7 @@ export default function Home() {
             
             <Link 
               to="/login" 
-              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-indigo-700 bg-white rounded-xl border-2 border-indigo-700 hover:bg-indigo-50 transition-all duration-300 hover:scale-105 hover:shadow-lg"
+              className="inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-indigo-700 bg-white rounded-xl border-2 border-indigo-700 hover:bg-indigo-50 transition-all duration-300 hover:scale-105 hover:shadow-lg cursor-pointer"
             >
               Sign In
             </Link>
@@ -84,11 +100,11 @@ export default function Home() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-8 max-w-2xl mx-auto animate-fadeInUp delay-400">
             <div className="transition-transform hover:scale-110 duration-300">
-              <div className="text-3xl font-bold text-indigo-600">10K+</div>
+              <div className="text-3xl font-bold text-indigo-600">{docCount > 0 ? `${docCount}` : '0'}</div>
               <div className="text-sm text-gray-600">Documents Analyzed</div>
             </div>
             <div className="transition-transform hover:scale-110 duration-300">
-              <div className="text-3xl font-bold text-indigo-600">99%</div>
+              <div className="text-3xl font-bold text-indigo-600">{avgAccuracy}%</div>
               <div className="text-sm text-gray-600">Accuracy Rate</div>
             </div>
             <div className="transition-transform hover:scale-110 duration-300">
@@ -197,7 +213,7 @@ export default function Home() {
           </p>
           <Link 
             to="/signup" 
-            className="inline-flex items-center px-10 py-5 text-lg font-bold text-indigo-600 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-2xl animate-fadeInUp delay-300"
+            className="inline-flex items-center px-10 py-5 text-lg font-bold text-indigo-600 bg-white rounded-xl hover:bg-gray-100 transition-all duration-300 hover:scale-105 shadow-2xl animate-fadeInUp delay-300 cursor-pointer"
           >
             <span>Start Free Trial</span>
             <svg className="w-6 h-6 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

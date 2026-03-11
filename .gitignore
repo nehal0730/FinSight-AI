@@ -122,6 +122,13 @@ ai-service/data/*.json
 ai-service/data/*.parquet
 !ai-service/data/README.md
 
+# FAISS vector indices
+*.faiss
+
+# Database files
+*.sqlite3
+*.db
+
 # Generated reports and plots
 ai-service/reports/
 reports/plots/

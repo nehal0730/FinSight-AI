@@ -6,6 +6,7 @@ from pathlib import Path
 from app.routes.analyze import router as analyze_router
 from app.routes.query import router as query_router
 from app.routes.risk_analysis import router as risk_analysis_router
+from app.routes.fraud_detect import router as fraud_detect_router
 from app.config.rag_config import get_rag_config
 from app.services.rag.rag_pipeline import RAGPipeline
 from app.utils.logging import api_logger
@@ -72,6 +73,7 @@ def health():
 app.include_router(analyze_router)
 app.include_router(query_router)
 app.include_router(risk_analysis_router)
+app.include_router(fraud_detect_router)
 
 # ========== Startup Event ==========
 

@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { Sparkles, LogOut, User } from 'lucide-react';
 
 export default function Navbar() {
   const location = useLocation();
@@ -28,56 +29,39 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white shadow-md border-b border-gray-200">
+    <nav className="bg-white/80 backdrop-blur-xl shadow-lg border-b border-white/20 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
-            <Link to="/" className="flex items-center">
-              <span className="text-2xl font-bold text-indigo-600">FinSight AI</span>
+            <Link to="/" className="flex items-center gap-2 group cursor-pointer">
+              <div className="h-9 w-9 bg-gradient-to-r from-indigo-600 to-cyan-600 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-cyan-600 bg-clip-text text-transparent">
+                FinSight AI
+              </span>
             </Link>
             
             {isLoggedIn && (
-              <div className="hidden md:flex space-x-4">
-                <Link
-                  to="/upload"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/upload')
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  Upload
-                </Link>
-                <Link
-                  to="/dashboard"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/dashboard')
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/chat"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/chat')
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  Chat
-                </Link>
-                <Link
-                  to="/reports"
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/reports')
-                      ? 'bg-indigo-600 text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  Reports
-                </Link>
+              <div className="hidden md:flex space-x-1">
+                {[
+                  { to: '/upload', label: 'Upload' },
+                  { to: '/dashboard', label: 'Dashboard' },
+                  { to: '/chat', label: 'Chat' },
+                  { to: '/reports', label: 'Reports' },
+                ].map(({ to, label }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${
+                      isActive(to)
+                        ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-md'
+                        : 'text-gray-600 hover:text-indigo-700 hover:bg-indigo-50'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                ))}
               </div>
             )}
           </div>
@@ -85,16 +69,18 @@ export default function Navbar() {
           <div className="flex items-center space-x-4">
             {isLoggedIn ? (
               <>
-                <span className="text-sm text-gray-600">Welcome, {userName}</span>
+                <span className="text-sm text-gray-600 flex items-center gap-1.5">
+                  <User className="w-4 h-4" /> {userName}
+                </span>
                 <button
                   onClick={handleLogout}
-                  className="btn-secondary text-sm"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all cursor-pointer"
                 >
-                  Logout
+                  <LogOut className="w-4 h-4" /> Logout
                 </button>
               </>
             ) : (
-              <Link to="/login" className="btn-primary text-sm">
+              <Link to="/login" className="btn-primary text-sm cursor-pointer">
                 Login
               </Link>
             )}

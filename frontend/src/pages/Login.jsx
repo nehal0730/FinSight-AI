@@ -95,7 +95,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer"
                 >
                   {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
                 </button>
@@ -134,10 +134,10 @@ export default function Login() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+            <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
               <Circle className="w-5 h-5 text-blue-600 fill-blue-600" />
             </button>
-            <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+            <button className="flex items-center justify-center py-3 px-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
               <Square className="w-5 h-5 text-blue-700 fill-blue-700" />
             </button>
           </div>

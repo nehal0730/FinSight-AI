@@ -1,7 +1,7 @@
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.schemas.response_schema import RiskAnalysisResponse, Transaction
 from app.services.document import PDFProcessor, TextCleaner
@@ -19,7 +19,7 @@ def cleanup_temp(file_path: Path | None):
 
 
 @router.post("/risk-analysis", response_model=RiskAnalysisResponse)
-async def risk_analysis(file: UploadFile = File(...)):
+async def risk_analysis(file: UploadFile = File(...), use_llm: bool = Form(False)):
     """Run the focused risk analysis pipeline on a PDF statement.
 
     Pipeline:
@@ -64,6 +64,7 @@ async def risk_analysis(file: UploadFile = File(...)):
                 "pages": extracted.pages,
                 "ocr_pages": extracted.ocr_pages_count,
             },
+            use_llm=use_llm,
         )
 
         if result is None:

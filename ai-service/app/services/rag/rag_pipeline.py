@@ -21,6 +21,7 @@ import os
 from app.config.rag_config import RAGSystemConfig, get_rag_config
 from app.services.rag.chunking import DocumentChunker, Chunk
 from app.services.rag.embeddings import EmbeddingService
+from app.services.rag.mongo_vector_store import MongoVectorStore
 from app.services.rag.vector_store import FAISSVectorStore
 from app.services.rag.retriever import Retriever, RetrievedChunk
 from app.services.rag.prompt_engine import PromptEngine, PromptContext, ResponseFormatter
@@ -66,10 +67,28 @@ class RAGPipeline:
         
         self.embedding_service = EmbeddingService(self.config.embedding)
         
-        self.vector_store = FAISSVectorStore(
-            storage_dir=self.config.vector_store_root,
-            embedding_dim=self.embedding_service.get_embedding_dim()
-        )
+        # Initialize vector store - MongoDB or local FAISS
+        mongodb_uri = os.getenv("MONGODB_URI")
+        if mongodb_uri:
+            try:
+                self.vector_store = MongoVectorStore(
+                    mongo_uri=mongodb_uri,
+                    embedding_dim=self.embedding_service.get_embedding_dim()
+                )
+                api_logger.info("✓ Using MongoDB for vector storage")
+            except Exception as e:
+                api_logger.error(f"MongoDB initialization failed: {e}. Falling back to local FAISS.")
+                self.vector_store = FAISSVectorStore(
+                    storage_dir=self.config.vector_store_root,
+                    embedding_dim=self.embedding_service.get_embedding_dim()
+                )
+        else:
+            # Use local FAISS for development
+            api_logger.info("MONGODB_URI not set. Using local FAISS storage.")
+            self.vector_store = FAISSVectorStore(
+                storage_dir=self.config.vector_store_root,
+                embedding_dim=self.embedding_service.get_embedding_dim()
+            )
         
         self.retriever = Retriever(
             config=self.config.retrieval,

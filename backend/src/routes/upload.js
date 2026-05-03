@@ -2,20 +2,12 @@ const express = require("express");
 const axios = require("axios"); //for making HTTP requests
 const FormData = require("form-data"); //to create form data for file upload
 const { Readable } = require("stream");
-const path = require("path");
-const fs = require("fs");
 const upload = require("../middleware/upload.js");
 const auth = require("../middleware/auth");
 const logger = require("../config/logger");
 const { AI_SERVICE_URL } = require("../config/env");
 const Document = require("../models/Document");
-
-const PDF_STORAGE_DIR = path.join(__dirname, "..", "..", "uploads", "pdfs");
-
-// Ensure upload directory exists
-if (!fs.existsSync(PDF_STORAGE_DIR)) {
-  fs.mkdirSync(PDF_STORAGE_DIR, { recursive: true });
-}
+const { uploadPDF } = require("../utils/mongoStorage");
 
 const router = express.Router();
 
@@ -49,17 +41,34 @@ router.post("/", auth, upload.single("file"), async (req, res, next) => {
     const documentId = aiResponse.data?.storage_ref?.id || req.file.originalname;
     logger.info(`Saving to MongoDB - fileName: ${req.file.originalname}, documentId: ${documentId}, userId: ${req.user.id}`);
     
-    // Save PDF to disk
-    const safeFileName = `${documentId}.pdf`;
-    const filePath = path.join(PDF_STORAGE_DIR, safeFileName);
-    fs.writeFileSync(filePath, req.file.buffer);
-    logger.info(`PDF saved to disk: ${filePath}`);
+    // Save PDF to MongoDB GridFS
+    const gridFSResult = await uploadPDF(
+      req.file.buffer,
+      `${documentId}.pdf`,
+      {
+        originalName: req.file.originalname,
+        uploadedBy: req.user.id,
+        documentId: documentId,
+        uploadedAt: new Date()
+      }
+    );
 
+    if (!gridFSResult.success) {
+      logger.error(`GridFS upload failed: ${gridFSResult.error}`);
+      return res.status(500).json({
+        success: false,
+        error: "Failed to store PDF file"
+      });
+    }
+
+    logger.info(`✓ PDF stored in MongoDB GridFS: ${gridFSResult.fileId}`);
+
+    // Save Document record with GridFS fileId
     await Document.create({
       fileName: req.file.originalname,
       documentId: documentId,
       userId: req.user.id,
-      filePath: safeFileName,
+      gridFSFileId: gridFSResult.fileId,  // Store GridFS file ID instead of local path
       fileSize: req.file.size,
     });
 
@@ -136,19 +145,40 @@ router.get("/pdf/:documentId", async (req, res, next) => {
       return res.status(403).json({ success: false, error: "Access denied" });
     }
 
-    if (!doc.filePath) {
-      return res.status(404).json({ success: false, error: "PDF file not available (uploaded before PDF storage was enabled)" });
-    }
+    // Try GridFS first, then fall back to local file for backwards compatibility
+    let pdfData = null;
 
-    const filePath = path.join(PDF_STORAGE_DIR, doc.filePath);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, error: "PDF file not found on disk" });
+    if (doc.gridFSFileId) {
+      // Fetch from MongoDB GridFS
+      const { downloadPDF } = require("../utils/mongoStorage");
+      const dlResult = await downloadPDF(doc.gridFSFileId.toString());
+      
+      if (dlResult.success) {
+        pdfData = dlResult.data;
+      } else {
+        logger.error(`GridFS download failed: ${dlResult.error}`);
+        return res.status(404).json({ success: false, error: "PDF file not available" });
+      }
+    } else if (doc.filePath) {
+      // Fall back to local disk for old uploads
+      const path = require("path");
+      const fs = require("fs");
+      const PDF_STORAGE_DIR = path.join(__dirname, "..", "..", "uploads", "pdfs");
+      const filePath = path.join(PDF_STORAGE_DIR, doc.filePath);
+      
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ success: false, error: "PDF file not found" });
+      }
+      
+      pdfData = fs.readFileSync(filePath);
+    } else {
+      return res.status(404).json({ success: false, error: "PDF file not available" });
     }
 
     const disposition = req.query.action === 'download' ? 'attachment' : 'inline';
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(doc.fileName)}"`);
-    fs.createReadStream(filePath).pipe(res);
+    res.send(pdfData);
   } catch (err) {
     logger.error(`PDF serve error: ${err.message}`);
     next(err);

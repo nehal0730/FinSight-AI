@@ -1,15 +1,13 @@
 const express = require("express");
 const axios = require("axios");
-const path = require("path");
-const fs = require("fs");
 const FormData = require("form-data");
+const { Readable } = require("stream");
 const auth = require("../middleware/auth");
 const logger = require("../config/logger");
 const { AI_SERVICE_URL } = require("../config/env");
 const RiskAnalysis = require("../models/RiskAnalysis");
 const Document = require("../models/Document");
-
-const PDF_STORAGE_DIR = path.join(__dirname, "..", "..", "uploads", "pdfs");
+const { downloadPDF } = require("../utils/mongoStorage");
 
 const router = express.Router();
 
@@ -130,28 +128,56 @@ router.post("/regenerate", auth, async (req, res, next) => {
 
     logger.info(`Regenerating analysis with LLM - documentId: ${documentId}, analysisId: ${analysisId}`);
 
-    // Locate the saved PDF on disk via Document record
+    // Locate the saved PDF via Document record
     const doc = await Document.findOne({ documentId });
-    if (!doc || !doc.filePath) {
+    if (!doc) {
       return res.status(404).json({
         success: false,
         error: "Document not found. Please re-upload the PDF."
       });
     }
 
-    const pdfPath = path.join(PDF_STORAGE_DIR, doc.filePath);
-    if (!fs.existsSync(pdfPath)) {
+    // Get PDF from MongoDB GridFS
+    let pdfBuffer = null;
+
+    if (doc.gridFSFileId) {
+      const dlResult = await downloadPDF(doc.gridFSFileId.toString());
+      if (!dlResult.success) {
+        logger.error(`GridFS download failed: ${dlResult.error}`);
+        return res.status(404).json({
+          success: false,
+          error: "PDF file not available in storage. Please re-upload the document."
+        });
+      }
+      pdfBuffer = dlResult.data;
+    } else if (doc.filePath) {
+      // Fallback for old uploads with local file paths
+      const path = require("path");
+      const fs = require("fs");
+      const PDF_STORAGE_DIR = path.join(__dirname, "..", "..", "uploads", "pdfs");
+      const pdfPath = path.join(PDF_STORAGE_DIR, doc.filePath);
+      
+      if (!fs.existsSync(pdfPath)) {
+        return res.status(404).json({
+          success: false,
+          error: "PDF file not found. Please re-upload the document."
+        });
+      }
+      pdfBuffer = fs.readFileSync(pdfPath);
+    } else {
       return res.status(404).json({
         success: false,
-        error: "PDF file not found on disk. Please re-upload the document."
+        error: "PDF file location not found. Please re-upload the document."
       });
     }
 
-    // Re-run risk analysis against the stored PDF with use_llm=true
+    // Re-run risk analysis against the PDF with use_llm=true
     const formData = new FormData();
-    formData.append("file", fs.createReadStream(pdfPath), {
+    const bufferStream = Readable.from(pdfBuffer);
+    formData.append("file", bufferStream, {
       filename: doc.fileName,
       contentType: "application/pdf",
+      knownLength: pdfBuffer.length,
     });
     formData.append("use_llm", "true");
 

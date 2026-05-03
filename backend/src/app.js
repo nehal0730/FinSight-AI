@@ -12,7 +12,14 @@ const requestLogger = require("./middleware/request");
 
 const app = express();
 
-app.use(cors({ origin: "http://localhost:5173", credentials: false }));
+// Determine allowed origins based on environment
+const allowedOrigins = [
+  "http://localhost:5173",  // Local dev
+  "http://localhost:3000",  // Local dev alternative
+  process.env.FRONTEND_URL || "http://localhost:5173" // Production frontend
+];
+
+app.use(cors({ origin: allowedOrigins, credentials: false }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(requestLogger);

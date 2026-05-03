@@ -42,7 +42,12 @@ export default function Dashboard() {
         const mergedHistory = history.map(item => ({
           ...item,
           isFromBackend: backendDocuments.some(doc => doc.documentId === item.id)
-        }));
+        }))
+          .sort((a, b) => {
+            const aTs = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const bTs = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            return bTs - aTs;
+          });
         
         setRiskHistory(mergedHistory);
 
@@ -202,7 +207,7 @@ export default function Dashboard() {
               >
                 {riskHistory.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.fileName} - {new Date(item.createdAt).toLocaleString()}
+                    {item.fileName} - {new Date(item.updatedAt || item.createdAt).toLocaleString()}
                   </option>
                 ))}
               </select>

@@ -247,9 +247,9 @@ class TestReportGenerator(unittest.TestCase):
             ReportGenerator._determine_risk_level(50.0, False), "MEDIUM"
         )
 
-        # LOW-MEDIUM: is_fraud=False and 35 <= score < 45
+        # LOW: is_fraud=False and score < 45
         self.assertEqual(
-            ReportGenerator._determine_risk_level(40.0, False), "LOW-MEDIUM"
+            ReportGenerator._determine_risk_level(40.0, False), "LOW"
         )
 
         # LOW: is_fraud=False and score < 35

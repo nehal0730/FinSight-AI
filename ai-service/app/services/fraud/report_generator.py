@@ -92,8 +92,12 @@ class ReportGenerator:
                     detected_issues=detected_issues
                 )
                 
-                # Override rule-based recommendation with LLM version
-                recommendation = llm_recommendation
+                # Keep recommendation severity aligned with deterministic risk band.
+                recommendation = cls._normalize_recommendation_for_risk(
+                    llm_recommendation,
+                    risk_score,
+                    is_fraud,
+                )
                 
             except Exception as e:
                 from app.utils.logging import api_logger
@@ -139,12 +143,11 @@ class ReportGenerator:
     @classmethod
     def _determine_risk_level(cls, risk_score: float, is_fraud: bool) -> str:
         """Determine risk level category."""
-        if is_fraud and risk_score >= cls.HIGH_RISK_THRESHOLD:
+        safe_score = max(0.0, min(100.0, float(risk_score)))
+        if safe_score >= cls.HIGH_RISK_THRESHOLD:
             return "HIGH"
-        elif is_fraud or risk_score >= cls.MEDIUM_RISK_THRESHOLD:
+        elif safe_score >= cls.MEDIUM_RISK_THRESHOLD:
             return "MEDIUM"
-        elif risk_score >= cls.LOW_MEDIUM_THRESHOLD:
-            return "LOW-MEDIUM"
         else:
             return "LOW"
 
@@ -174,23 +177,25 @@ class ReportGenerator:
         cls, risk_score: float, is_fraud: bool, detected_issues: list[str]
     ) -> str:
         """Generate compliance recommendation based on risk assessment."""
-        if is_fraud and risk_score >= cls.HIGH_RISK_THRESHOLD:
+        safe_score = max(0.0, min(100.0, float(risk_score)))
+
+        if is_fraud and safe_score >= cls.HIGH_RISK_THRESHOLD:
             return (
                 "URGENT: Manual compliance review required. "
                 "Consider immediate account review, transaction blocking, or escalation to fraud investigation team."
             )
-        elif is_fraud:
+        elif is_fraud and safe_score >= cls.MEDIUM_RISK_THRESHOLD:
             return (
                 "Manual compliance review required. "
                 "Monitor account closely and investigate flagged transactions. "
                 "Consider enhanced verification procedures."
             )
-        elif risk_score >= cls.MEDIUM_RISK_THRESHOLD:
+        elif safe_score >= cls.MEDIUM_RISK_THRESHOLD:
             return (
                 "Enhanced monitoring recommended. "
                 "Review flagged patterns and verify account holder identity if suspicious activity continues."
             )
-        elif risk_score >= cls.LOW_MEDIUM_THRESHOLD:
+        elif safe_score >= cls.LOW_MEDIUM_THRESHOLD:
             return (
                 "Continue standard monitoring. "
                 "Some unusual patterns detected but no immediate action required. "
@@ -201,6 +206,34 @@ class ReportGenerator:
                 "No action required. "
                 "Transaction pattern is within normal range. Continue standard compliance procedures."
             )
+
+    @classmethod
+    def _normalize_recommendation_for_risk(
+        cls,
+        recommendation_text: str | None,
+        risk_score: float,
+        is_fraud: bool,
+    ) -> str:
+        """Prevent recommendation severity from exceeding the computed risk band."""
+        text = str(recommendation_text or "").strip()
+        if not text:
+            return cls._generate_recommendation(risk_score, is_fraud, detected_issues=[])
+
+        safe_score = max(0.0, min(100.0, float(risk_score)))
+        urgent_markers = (
+            "urgent",
+            "immediate action",
+            "immediate account review",
+            "account suspension",
+        )
+
+        if safe_score < cls.HIGH_RISK_THRESHOLD and any(marker in text.lower() for marker in urgent_markers):
+            return cls._generate_recommendation(risk_score, is_fraud, detected_issues=[])
+
+        if safe_score < cls.MEDIUM_RISK_THRESHOLD and "manual compliance review required" in text.lower():
+            return cls._generate_recommendation(risk_score, is_fraud, detected_issues=[])
+
+        return text
 
     @classmethod
     def _format_text_report(cls, report: dict[str, Any]) -> str:
@@ -288,7 +321,6 @@ class ReportGenerator:
         risk_emoji = {
             "HIGH": "🔴",
             "MEDIUM": "🟡",
-            "LOW-MEDIUM": "🟠",
             "LOW": "🟢",
         }
         emoji = risk_emoji.get(report["risk_level"], "⚪")

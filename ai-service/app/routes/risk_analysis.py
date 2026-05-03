@@ -71,36 +71,41 @@ async def risk_analysis(file: UploadFile = File(...), use_llm: bool = Form(False
             return RiskAnalysisResponse(
                 risk_score=0.0,
                 final_risk_level="LOW",
+                is_fraud=False,
                 reasons=["No transactions detected in the uploaded document."],
                 transactions=[],
-                fraud_score=0.0,
-                anomaly_score=0.0,
-                model_is_fraud=False,
-                ml_risk_level="low",
-                is_fraud=False,
-                combined_score=0.0,
                 transactions_extracted=0,
                 report={
                     "document_name": file.filename,
                     "message": "No transactions detected for risk analysis.",
                 },
+                model_metadata={
+                    "pipeline_version": "balanced-ml-rules-v1",
+                    "scoring_method": "80% ML anomaly + 20% rule-based validation",
+                    "model_source": "Kaggle creditcard dataset",
+                    "expected_feature_count": 0,
+                    "provided_feature_count": 0,
+                    "feature_alignment_action": "none",
+                },
             )
 
-        risk_score = max(0.0, min(1.0, float(result["anomaly_score"])))
+        # Use the pipeline's final, takeover-aware score/level when present
+        final_score = round(
+            max(float(result.get("combined_score", 0.0)), float(result.get("takeover_score", 0.0))),
+            2,
+        )
+        final_risk_level = str(result.get("final_risk_level", result.get("hybrid_risk_level", "LOW"))).upper()
+        final_is_fraud = bool(result.get("is_fraud", result.get("model_is_fraud", False)))
 
         return RiskAnalysisResponse(
-            risk_score=round(risk_score, 4),
-            final_risk_level=str(result["final_risk_level"]).upper(),
+            risk_score=final_score,
+            final_risk_level=final_risk_level,
+            is_fraud=final_is_fraud,
             reasons=list(result["reasons"]),
             transactions=[Transaction(**txn) for txn in result["transactions"][:10]],
-            fraud_score=round(float(result["fraud_score"]), 2),
-            anomaly_score=float(result["anomaly_score"]),
-            model_is_fraud=bool(result["model_is_fraud"]),
-            ml_risk_level=str(result["model_risk_level"]),
-            is_fraud=bool(result["is_fraud"]),
-            combined_score=round(float(result["combined_score"]), 2),
             transactions_extracted=len(result["transactions"]),
             report=result["report"],
+            model_metadata=result.get("model_metadata", {}),
         )
 
     except ValueError as exc:

@@ -12,7 +12,7 @@ export default function Home() {
       setDocCount(history.length);
       if (history.length > 0) {
         setAvgAccuracy(
-          Math.round(history.reduce((s, r) => s + (100 - Number(r?.riskResponse?.combined_score || 0)), 0) / history.length)
+          Math.round(history.reduce((s, r) => s + (100 - Number(r?.riskResponse?.risk_score || 0)), 0) / history.length)
         );
       }
     });

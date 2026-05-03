@@ -10,9 +10,6 @@ class FeatureEngineer:
     HIGH_RISK_PATTERNS = {
         "casino",
         "gambling",
-        "crypto",
-        "bitcoin",
-        "forex",
         "betting",
         "lottery",
         "atm",
@@ -23,11 +20,22 @@ class FeatureEngineer:
         "wire transfer",
     }
 
+    # Trading / investment activity that can be legitimate when consistent.
+    SENSITIVE_PATTERNS = {
+        "crypto",
+        "bitcoin",
+        "forex",
+    }
+
     # Legitimate merchant patterns (low-risk indicators)
     LEGITIMATE_PATTERNS = {
         "salary",
         "payroll",
         "employer",
+        "emi",
+        "loan",
+        "installment",
+        "repayment",
         "refund",
         "interest",
         "dividend",
@@ -94,6 +102,8 @@ class FeatureEngineer:
             **cls._behavioral_features(transactions),
             # Transaction type analysis
             **cls._transaction_type_features(transactions),
+            # Additional ratio features for model compatibility and explainability
+            **cls._ratio_features(transactions),
             # Time-based velocity features
             **cls._velocity_features(transactions),
             # Spending spike detection
@@ -190,6 +200,9 @@ class FeatureEngineer:
             1 for m in merchants if cls._is_legitimate_merchant(m)
         )
         unique_merchants = len(set(merchants))
+        sensitive_count = sum(
+            1 for m in merchants if cls._is_sensitive_merchant(m)
+        )
 
         return {
             "high_risk_merchants": float(high_risk_count),
@@ -205,9 +218,15 @@ class FeatureEngineer:
         """Features based on suspicious behavioral patterns."""
         amounts = [t.get("amount", 0) for t in transactions if t.get("amount")]
         merchants = [t.get("merchant", "") for t in transactions]
+        suspicious_merchants = [
+            merchant
+            for merchant in merchants
+            if not cls._is_legitimate_merchant(merchant)
+            and not cls._is_sensitive_merchant(merchant)
+        ]
 
-        # Rapid transaction sequences (same merchant within short sequence)
-        rapid_same_merchant = cls._count_rapid_repeats(merchants)
+        # Rapid transaction sequences are only suspicious when they involve non-legitimate merchants.
+        rapid_same_merchant = cls._count_rapid_repeats(suspicious_merchants)
 
         # Cash-like activity (ATM, transfers)
         cash_activity = sum(
@@ -252,6 +271,38 @@ class FeatureEngineer:
             "total_credited": float(total_credited),
             "avg_debit_amount": float(mean(debits)) if debits else 0.0,
             "avg_credit_amount": float(mean(credits)) if credits else 0.0,
+        }
+
+    @staticmethod
+    def _ratio_features(transactions: list[dict[str, any]]) -> dict[str, float]:
+        """Two derived ratio features to keep a stable 30-feature vector."""
+        if not transactions:
+            return {
+                "high_risk_merchant_ratio": 0.0,
+                "debit_amount_share": 0.0,
+            }
+
+        high_risk_count = 0
+        total_debited = 0.0
+        total_credited = 0.0
+
+        for txn in transactions:
+            merchant = str(txn.get("merchant", ""))
+            if FeatureEngineer._is_high_risk_merchant(merchant) or FeatureEngineer._is_sensitive_merchant(merchant):
+                high_risk_count += 1
+
+            amount = float(txn.get("amount", 0.0) or 0.0)
+            txn_type = str(txn.get("type", "")).lower()
+            if txn_type == "debit":
+                total_debited += amount
+            elif txn_type == "credit":
+                total_credited += amount
+
+        total_amount = total_debited + total_credited
+
+        return {
+            "high_risk_merchant_ratio": float(high_risk_count / len(transactions)),
+            "debit_amount_share": float(total_debited / total_amount) if total_amount > 0 else 0.0,
         }
 
     @staticmethod
@@ -346,6 +397,15 @@ class FeatureEngineer:
         )
 
     @classmethod
+    def _is_sensitive_merchant(cls, merchant: str) -> bool:
+        """Check if merchant name matches sensitive trading / investment patterns."""
+        merchant_lower = merchant.lower()
+        return any(
+            re.search(rf'\b{re.escape(pattern)}', merchant_lower)
+            for pattern in cls.SENSITIVE_PATTERNS
+        )
+
+    @classmethod
     def _is_legitimate_merchant(cls, merchant: str) -> bool:
         """Check if merchant name matches legitimate patterns.
         
@@ -396,6 +456,8 @@ class FeatureEngineer:
             "total_credited": 0.0,
             "avg_debit_amount": 0.0,
             "avg_credit_amount": 0.0,
+            "high_risk_merchant_ratio": 0.0,
+            "debit_amount_share": 0.0,
             "txn_velocity_5min": 0.0,
             "txn_velocity_1hour": 0.0,
             "txn_velocity_24hour": 0.0,
@@ -428,6 +490,9 @@ class FeatureEngineer:
 
         # High-risk merchant activity (strongest signal)
         score += features.get("high_risk_merchants", 0) * 10.0
+
+        # Sustained sensitive trading / investment activity (moderate signal)
+        score += features.get("high_risk_merchant_ratio", 0) * 75.0
 
         # Large suspicious debits (reduced weight - large amounts can be legitimate)
         score += features.get("large_debit_transactions", 0) * 1.0

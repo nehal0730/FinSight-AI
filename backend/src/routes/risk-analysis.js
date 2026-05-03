@@ -1,9 +1,15 @@
 const express = require("express");
 const axios = require("axios");
+const path = require("path");
+const fs = require("fs");
+const FormData = require("form-data");
 const auth = require("../middleware/auth");
 const logger = require("../config/logger");
 const { AI_SERVICE_URL } = require("../config/env");
 const RiskAnalysis = require("../models/RiskAnalysis");
+const Document = require("../models/Document");
+
+const PDF_STORAGE_DIR = path.join(__dirname, "..", "..", "uploads", "pdfs");
 
 const router = express.Router();
 
@@ -15,13 +21,14 @@ router.get("/history", auth, async (req, res, next) => {
   try {
     const filter = req.user.role === "admin" ? {} : { userId: req.user.id };
     const records = await RiskAnalysis.find(filter)
-      .sort({ createdAt: -1 })
+      .sort({ updatedAt: -1 })
       .lean();
 
     const data = records.map((r) => ({
       id: r.recordId,
       userId: r.userId,
       createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
       fileName: r.fileName,
       uploadResponse: r.uploadResponse,
       riskResponse: r.riskResponse,
@@ -69,6 +76,7 @@ router.post("/", auth, async (req, res, next) => {
         id: record.recordId,
         userId: record.userId,
         createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
         fileName: record.fileName,
       },
       error: null,
@@ -122,16 +130,37 @@ router.post("/regenerate", auth, async (req, res, next) => {
 
     logger.info(`Regenerating analysis with LLM - documentId: ${documentId}, analysisId: ${analysisId}`);
 
-    // Call AI service to regenerate with LLM enabled
-    // The AI service should support re-analyzing an already uploaded document
+    // Locate the saved PDF on disk via Document record
+    const doc = await Document.findOne({ documentId });
+    if (!doc || !doc.filePath) {
+      return res.status(404).json({
+        success: false,
+        error: "Document not found. Please re-upload the PDF."
+      });
+    }
+
+    const pdfPath = path.join(PDF_STORAGE_DIR, doc.filePath);
+    if (!fs.existsSync(pdfPath)) {
+      return res.status(404).json({
+        success: false,
+        error: "PDF file not found on disk. Please re-upload the document."
+      });
+    }
+
+    // Re-run risk analysis against the stored PDF with use_llm=true
+    const formData = new FormData();
+    formData.append("file", fs.createReadStream(pdfPath), {
+      filename: doc.fileName,
+      contentType: "application/pdf",
+    });
+    formData.append("use_llm", "true");
+
     const aiResponse = await axios.post(
-      `${AI_SERVICE_URL}/risk-analysis/regenerate`,
+      `${AI_SERVICE_URL}/risk-analysis`,
+      formData,
       {
-        document_id: documentId,
-        use_llm: true
-      },
-      {
-        timeout: 300000 // 5 minute timeout for LLM processing
+        headers: formData.getHeaders(),
+        timeout: 300000
       }
     );
 
@@ -146,30 +175,21 @@ router.post("/regenerate", auth, async (req, res, next) => {
     });
 
   } catch (err) {
-    if (err.response) {
-      // AI service returned an error
-      logger.error(`AI service error: ${err.response.status} - ${JSON.stringify(err.response.data)}`);
-      const errorMsg = err.response.data?.detail || err.response.data?.error || "Regeneration failed";
-      
-      // Check if it's a 404 (endpoint not found) and provide helpful message
-      if (err.response.status === 404) {
-        return res.status(400).json({
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status;
+      const errorMsg = err.response?.data?.detail || err.response?.data?.error || err.message;
+      logger.error(`AI service error during regeneration: ${status} - ${errorMsg}`);
+
+      if (err.code === 'ECONNABORTED') {
+        return res.status(504).json({
           success: false,
-          error: "The AI service doesn't support regenerating existing analyses. Please re-upload the document with the 'AI Summary' option enabled on the Upload page."
+          error: "Analysis generation timed out. This can happen with large documents. Please try again."
         });
       }
 
-      return res.status(err.response.status).json({
+      return res.status(status || 502).json({
         success: false,
         error: errorMsg
-      });
-    }
-
-    if (err.code === 'ECONNABORTED') {
-      logger.error(`Regeneration timeout: ${err.message}`);
-      return res.status(504).json({
-        success: false,
-        error: "Analysis generation timed out. This can happen with large documents. Please try again."
       });
     }
 

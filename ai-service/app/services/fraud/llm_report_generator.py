@@ -100,20 +100,34 @@ class LLMReportGenerator:
         if not self.client:
             return self._fallback_recommendation(risk_score, is_fraud)
 
+        safe_score = max(0.0, min(100.0, float(risk_score)))
+        if safe_score >= 70:
+            risk_band = "HIGH"
+        elif safe_score >= 45:
+            risk_band = "MEDIUM"
+        else:
+            risk_band = "LOW"
+
         prompt = f"""Based on this fraud analysis:
 
 - Risk Score: {risk_score}/100
+- Risk Band: {risk_band}
 - Fraud Detected: {'YES' if is_fraud else 'NO'}
 - Flagged Issues: {len(detected_issues)}
 
 Issues:
 {chr(10).join(f'- {issue}' for issue in detected_issues[:5])}
 
-Generate a specific, actionable recommendation for compliance officers. 
+Generate a specific, actionable recommendation for compliance officers.
 Include:
-1. Immediate action required (approve/reject/review)
+1. Action urgency based on risk band
 2. Specific next steps (verification, investigation, monitoring)
 3. Timeline for action
+
+Severity policy (must follow):
+- HIGH: may use urgent language and immediate manual review.
+- MEDIUM: do NOT use urgent/immediate language; recommend enhanced monitoring and targeted review.
+- LOW: no immediate action required.
 
 Keep it under 100 words."""
 

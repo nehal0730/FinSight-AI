@@ -22,6 +22,8 @@
   "total_credited",
   "avg_debit_amount",
   "avg_credit_amount",
+  "high_risk_merchant_ratio",
+  "debit_amount_share",
   "txn_velocity_5min",
   "txn_velocity_1hour",
   "txn_velocity_24hour",

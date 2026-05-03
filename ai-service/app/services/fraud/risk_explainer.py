@@ -24,6 +24,18 @@ class RiskExplainer:
     CASH_LIKE_THRESHOLD = 2
     STD_DEV_THRESHOLD = 20000.0
     ZSCORE_THRESHOLD = 3.0
+    SENSITIVE_ACTIVITY_THRESHOLD = 2
+
+    ACCOUNT_TAKEOVER_KEYWORDS = (
+        "atm",
+        "cash withdrawal",
+        "withdrawal",
+        "transfer",
+        "wire transfer",
+        "unknown transfer",
+        "intl",
+        "international",
+    )
 
     @classmethod
     def explain_risk(
@@ -56,6 +68,17 @@ class RiskExplainer:
                     f"{count_str} transaction{'s' if high_risk_count > 1 else ''} "
                     f"with gambling, casino, or crypto merchants"
                 )
+
+        takeover = cls.detect_account_takeover_signal(transactions)
+        if takeover["score"] >= 70:
+            explanations.append(takeover["reason"])
+
+        # Sensitive trading / investment activity (crypto, bitcoin, forex)
+        sensitive_ratio = features.get("high_risk_merchant_ratio", 0)
+        if sensitive_ratio >= 0.5 and high_risk_count < cls.HIGH_RISK_MERCHANT_THRESHOLD:
+            explanations.append(
+                "Sustained trading or crypto activity detected; pattern is consistent but still warrants monitoring"
+            )
 
         # Large debit transactions
         large_debits = features.get("large_debit_transactions", 0)
@@ -225,8 +248,8 @@ class RiskExplainer:
             else:
                 verdict = "MEDIUM RISK - Suspicious activity detected"
         else:
-            if combined_score >= 35:
-                verdict = "LOW-MEDIUM RISK - Some unusual patterns detected"
+            if combined_score >= 45:
+                verdict = "MEDIUM RISK - Some unusual patterns detected"
             else:
                 verdict = "LOW RISK - Activity appears normal"
 
@@ -235,7 +258,7 @@ class RiskExplainer:
             recommendation = "Immediate review recommended. Consider blocking account or flagging for manual investigation."
         elif is_fraud:
             recommendation = "Manual review recommended. Monitor account for additional suspicious activity."
-        elif combined_score >= 35:
+        elif combined_score >= 45:
             recommendation = "Continue monitoring. No immediate action required."
         else:
             recommendation = "No action required. Transaction pattern is within normal range."
@@ -251,6 +274,70 @@ class RiskExplainer:
             },
             "recommendation": recommendation,
         }
+
+    @classmethod
+    def detect_account_takeover_signal(
+        cls,
+        transactions: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Detect a salary-to-cashout sequence commonly seen in account takeover cases."""
+        if not transactions or len(transactions) < 4:
+            return {"score": 0.0, "reason": ""}
+
+        normalized = []
+        for txn in transactions:
+            description = f"{txn.get('description', '')} {txn.get('merchant', '')}".lower()
+            txn_type = str(txn.get("type", "")).lower()
+            normalized.append((description, txn_type, float(txn.get("amount", 0.0) or 0.0)))
+
+        first_credit_index = next((idx for idx, (_, txn_type, _) in enumerate(normalized) if txn_type == "credit"), None)
+        if first_credit_index is None:
+            return {"score": 0.0, "reason": ""}
+
+        post_credit = normalized[first_credit_index + 1 :]
+        if len(post_credit) < 3:
+            return {"score": 0.0, "reason": ""}
+
+        cashout_hits = 0
+        transfer_hits = 0
+        suspicious_terms = []
+
+        for description, txn_type, _amount in post_credit:
+            if txn_type != "debit":
+                continue
+            if any(term in description for term in cls.ACCOUNT_TAKEOVER_KEYWORDS):
+                cashout_hits += 1
+                suspicious_terms.append(description)
+            if any(term in description for term in ("transfer", "wire transfer", "unknown transfer", "intl", "international")):
+                transfer_hits += 1
+
+        recent_debits = [item for item in post_credit if item[1] == "debit"][-3:]
+        recent_cashout_hits = sum(
+            1 for description, _txn_type, _amount in recent_debits
+            if any(term in description for term in cls.ACCOUNT_TAKEOVER_KEYWORDS)
+        )
+
+        if transfer_hits >= 2 and recent_cashout_hits >= 2:
+            reason = (
+                "Potential account takeover pattern: salary credit followed by rapid cash-out "
+                "through ATM / transfer / wire activity"
+            )
+            return {"score": 90.0, "reason": reason}
+
+        if cashout_hits >= 2 and recent_cashout_hits >= 2:
+            reason = (
+                "Potential account takeover pattern: salary credit followed by multiple cash-out "
+                "transactions and transfers"
+            )
+            return {"score": 75.0, "reason": reason}
+
+        if cashout_hits >= 1 and recent_cashout_hits >= 1 and transfer_hits >= 1:
+            reason = (
+                "Suspicious post-salary cash-out activity detected (ATM / transfer sequence)"
+            )
+            return {"score": 60.0, "reason": reason}
+
+        return {"score": 0.0, "reason": ""}
 
 
 def explain_fraud_risk(

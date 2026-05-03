@@ -135,11 +135,11 @@ export default function Reports() {
   const getRiskColor = (level) => {
     const n = String(level || '').toUpperCase();
     if (n === 'HIGH') return { text: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700', dot: 'bg-red-500' };
-    if (n === 'MEDIUM' || n === 'LOW-MEDIUM') return { text: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' };
+    if (n === 'MEDIUM') return { text: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', badge: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' };
     return { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' };
   };
 
-  const getRiskScore = (r) => Number(r?.riskResponse?.combined_score || 0);
+  const getRiskScore = (r) => Number(r?.riskResponse?.risk_score || 0);
   const getRiskLevel = (r) => String(r?.riskResponse?.final_risk_level || 'LOW').toUpperCase();
 
   const handleViewAnalysis = (report) => {
@@ -232,7 +232,7 @@ export default function Reports() {
       list = list.filter(r => {
         const lvl = getRiskLevel(r);
         if (filterLevel === 'high') return lvl === 'HIGH';
-        if (filterLevel === 'medium') return lvl === 'MEDIUM' || lvl === 'LOW-MEDIUM';
+        if (filterLevel === 'medium') return lvl === 'MEDIUM';
         return lvl === 'LOW';
       });
     }
@@ -269,7 +269,7 @@ export default function Reports() {
 
   const averageRiskScore = reports.length > 0 ? Math.round(reports.reduce((s, r) => s + getRiskScore(r), 0) / reports.length) : 0;
   const highRiskCount = reports.filter(r => getRiskLevel(r) === 'HIGH').length;
-  const mediumRiskCount = reports.filter(r => ['MEDIUM', 'LOW-MEDIUM'].includes(getRiskLevel(r))).length;
+  const mediumRiskCount = reports.filter(r => getRiskLevel(r) === 'MEDIUM').length;
   const lowRiskCount = reports.filter(r => getRiskLevel(r) === 'LOW').length;
 
   const doughnutCenterPlugin = useMemo(() => ({

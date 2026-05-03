@@ -106,25 +106,28 @@ class FraudDetector:
         anomaly_score: float,
         model_is_fraud: bool,
     ) -> dict[str, float | bool | str]:
-        """Combine heuristic and model outputs into one final fraud verdict."""
+        """Combine heuristic and model outputs into one final fraud verdict.
+        """
         safe_fraud = max(0.0, min(100.0, float(fraud_score)))
         safe_anomaly = max(0.0, float(anomaly_score))
 
         # Convert anomaly scale to 0-100 and compute a weighted hybrid score.
+        # The model remains the primary signal; rules act as a guardrail.
         normalized_anomaly = max(0.0, min(100.0, safe_anomaly * 100.0))
-        combined_score = (safe_fraud * 0.55) + (normalized_anomaly * 0.45)
+        combined_score = (safe_fraud * 0.20) + (normalized_anomaly * 0.80)
 
-        # Final verdict uses both signals, not just one.
+        # Final verdict uses both signals, but only escalates strongly when
+        # the rule score and the model both point in the same direction.
         final_is_fraud = (
-            (model_is_fraud and (safe_fraud >= 15.0 or safe_anomaly >= 0.50))
-            or safe_anomaly >= 0.68
-            or safe_fraud >= 70.0
-            or (combined_score >= 44.0 and (safe_anomaly >= 0.55 or safe_fraud >= 35.0))
+            safe_anomaly >= 0.90
+            or safe_fraud >= 75.0
+            or (combined_score >= 55.0 and (safe_anomaly >= 0.60 or safe_fraud >= 45.0))
+            or (model_is_fraud and (safe_anomaly >= 0.55 or safe_fraud >= 20.0))
         )
 
-        if combined_score >= 60.0 or safe_anomaly >= 0.60 or safe_fraud >= 65.0:
+        if combined_score >= 70.0 or safe_anomaly >= 0.75 or safe_fraud >= 75.0:
             risk_level = "high"
-        elif combined_score >= 35.0 or safe_anomaly >= 0.40 or safe_fraud >= 35.0:
+        elif combined_score >= 50.0 or safe_anomaly >= 0.50 or safe_fraud >= 50.0:
             risk_level = "medium"
         else:
             risk_level = "low"

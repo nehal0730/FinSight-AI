@@ -80,6 +80,7 @@ export default function Upload() {
       localStorage.setItem('analysisResult', JSON.stringify(uploadRes.data));
       const riskRecord = buildRiskRecord(file, riskRes.data, uploadRes.data);
       await saveRiskAnalysis(riskRecord);
+      localStorage.setItem('currentRiskAnalysis', JSON.stringify(riskRecord));
 
       clearInterval(progressInterval);
       setProgress(100);

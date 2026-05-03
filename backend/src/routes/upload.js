@@ -28,7 +28,12 @@ router.post("/", auth, upload.single("file"), async (req, res, next) => {
     // Stream file directly from memory buffer (no disk write)
     const formData = new FormData();
     const bufferStream = Readable.from(req.file.buffer);
-    formData.append("file", bufferStream, req.file.originalname);
+    // Preserve filename and MIME type so the AI service validates it as a PDF.
+    formData.append("file", bufferStream, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype || "application/pdf",
+      knownLength: req.file.size,
+    });
 
     // Node sends file stream to FastAPI, FastAPI analyzes file, Returns result
     const aiResponse = await axios.post(
@@ -70,6 +75,16 @@ router.post("/", auth, upload.single("file"), async (req, res, next) => {
     });
 
   } catch (err) {
+    if (axios.isAxiosError(err)) {
+      const upstreamStatus = err.response?.status || 502;
+      const upstreamDetail = err.response?.data?.detail || err.response?.data?.error || err.message;
+      logger.error(`AI upload/analyze failed: ${upstreamStatus} ${upstreamDetail}`);
+      return res.status(upstreamStatus).json({
+        success: false,
+        error: upstreamDetail,
+      });
+    }
+
     // Handle MongoDB duplicate key error specifically
     if (err.code === 11000) {
       logger.error(`Duplicate document ID: ${err.message}`);

@@ -185,17 +185,16 @@ class ExtractionResult(BaseModel):
 
 
 class RiskAnalysisResponse(BaseModel):
-    """Focused response for /risk-analysis endpoint."""
+    """Focused response for /risk-analysis endpoint using balanced ML + rule-based scoring."""
 
-    risk_score: float = Field(..., ge=0, le=1, description="ML risk score (0-1)")
-    final_risk_level: str = Field(..., description="Final hybrid risk level: LOW, MEDIUM, HIGH")
+    risk_score: float = Field(..., ge=0, le=100, description="Final risk score (0-100) combining ML anomaly detection with rule-based validation for balanced accuracy")
+    final_risk_level: str = Field(..., description="Risk level: LOW, MEDIUM, HIGH")
+    is_fraud: bool = Field(..., description="Fraud verdict (True if overall risk indicates fraud)")
     reasons: List[str] = Field(default=[], description="Detected anomaly reasons")
     transactions: List[Transaction] = Field(default=[], description="Parsed transaction records")
-    fraud_score: float = Field(..., ge=0, le=100, description="Rule-based fraud score (0-100)")
-    anomaly_score: float = Field(..., description="Raw anomaly score from model")
-    model_is_fraud: bool = Field(..., description="Raw model anomaly decision")
-    ml_risk_level: str = Field(..., description="Raw ML model risk level: low, medium, high")
-    is_fraud: bool = Field(..., description="Final hybrid fraud verdict")
-    combined_score: float = Field(..., ge=0, le=100, description="Hybrid score (0-100)")
     transactions_extracted: int = Field(..., ge=0, description="Number of extracted transactions")
     report: Dict[str, Any] = Field(..., description="Structured compliance report output")
+    model_metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Model artifact paths and scoring methodology for runtime transparency",
+    )

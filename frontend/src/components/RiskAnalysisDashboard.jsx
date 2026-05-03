@@ -24,7 +24,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js';
-import { Doughnut, Bar } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 
 ChartJS.register(
   ArcElement,
@@ -49,7 +49,7 @@ function getRiskTheme(level) {
       text: 'text-red-700',
     };
   }
-  if (normalized === 'MEDIUM' || normalized === 'LOW-MEDIUM') {
+  if (normalized === 'MEDIUM') {
     return {
       ring: '#d97706',
       badge: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -98,50 +98,45 @@ function downloadTextFile(content, fileName, mimeType) {
 export default function RiskAnalysisDashboard({ analysis }) {
   const [toastMessage, setToastMessage] = useState('');
 
-  const finalLevel = String(analysis?.final_risk_level || 'LOW').toUpperCase();
-  const combinedScore = Number(analysis?.combined_score || 0);
-  const mlScore = Number(analysis?.risk_score || 0);
+  const rawRiskScore = Number(analysis?.risk_score || 0);
+  const riskScore = rawRiskScore <= 1 ? rawRiskScore * 100 : rawRiskScore;
   const reasons = Array.isArray(analysis?.reasons) ? analysis.reasons : [];
   const transactions = Array.isArray(analysis?.transactions) ? analysis.transactions : [];
   const report = analysis?.report || {};
+  const modelMeta = analysis?.model_metadata || {};
   const metrics = report?.key_metrics || {};
   const insights = report?.document_insights || {};
-  const isFraud = Boolean(analysis?.is_fraud);
+  const rawIsFraud = analysis?.is_fraud;
+  const isFraud =
+    typeof rawIsFraud === 'boolean'
+      ? rawIsFraud
+      : ['true', '1', 'yes'].includes(String(rawIsFraud || '').toLowerCase());
+  const overrideReason = reasons.some((reason) => {
+    const text = String(reason || '').toLowerCase();
+    return text.includes('account takeover') || text.includes('cash-out') || text.includes('cash out');
+  });
+  const computedLevel = riskScore >= 70 ? 'HIGH' : riskScore >= 45 ? 'MEDIUM' : 'LOW';
+  const finalLevel = overrideReason ? 'HIGH' : computedLevel;
+  const showFraudFlag = isFraud && (riskScore >= 70 || overrideReason);
   const llmSummary = report?.llm_summary || null;
+  const expectedFeatureCount = Number(modelMeta?.expected_feature_count || 0);
+  const providedFeatureCount = Number(modelMeta?.provided_feature_count || 0);
+  const alignmentAction = String(modelMeta?.feature_alignment_action || 'none');
+  const isFeatureAligned = expectedFeatureCount > 0 && expectedFeatureCount === providedFeatureCount;
 
   const theme = getRiskTheme(finalLevel);
-  const normalizedPercent = Math.max(0, Math.min(100, combinedScore));
+  const normalizedPercent = Math.max(0, Math.min(100, riskScore));
   const circumference = 2 * Math.PI * 88;
   const dash = (normalizedPercent / 100) * circumference;
   const fileBaseName = toSafeFileBaseName(report?.report_id || report?.document_name || 'risk_analysis_report');
+  const recommendationText = String(report?.recommendation || '').trim();
+  const hasUrgentRecommendation = /urgent|immediate account review|manual compliance review required/i.test(recommendationText);
+  const safeRecommendation =
+    riskScore < 45 && hasUrgentRecommendation
+      ? 'No immediate action required. Continue standard monitoring and review only if unusual patterns persist.'
+      : recommendationText || 'No recommendation generated.';
 
   // --- Chart data ---
-  const scoreBreakdownData = useMemo(() => ({
-    labels: ['ML Score', 'Rule Score', 'Remaining'],
-    datasets: [{
-      data: [
-        Math.round(mlScore * 100),
-        Math.round(Number(analysis?.fraud_score || 0)),
-        Math.max(0, 100 - Math.round(mlScore * 100) - Math.round(Number(analysis?.fraud_score || 0))),
-      ],
-      backgroundColor: ['#6366f1', '#06b6d4', '#e5e7eb'],
-      borderColor: ['#4f46e5', '#0891b2', '#d1d5db'],
-      borderWidth: 2,
-      hoverOffset: 8,
-    }],
-  }), [mlScore, analysis?.fraud_score]);
-
-  const scoreBreakdownOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: '65%',
-    plugins: {
-      legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, pointStyleWidth: 10, font: { size: 12 } } },
-      tooltip: {
-        callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw}` },
-      },
-    },
-  };
 
   const transactionChartData = useMemo(() => {
     if (transactions.length === 0) return null;
@@ -237,7 +232,7 @@ export default function RiskAnalysisDashboard({ analysis }) {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-bold text-gray-900">{combinedScore.toFixed(2)}</span>
+                <span className="text-4xl font-bold text-gray-900">{riskScore.toFixed(2)}</span>
                 <span className="text-sm text-gray-600">Combined / 100</span>
                 <span className={`mt-3 px-3 py-1 text-xs font-bold rounded-full border ${theme.badge}`}>
                   {finalLevel}
@@ -273,22 +268,18 @@ export default function RiskAnalysisDashboard({ analysis }) {
                 </button>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                    isFraud ? 'bg-red-100 text-red-700 border-red-200' : 'bg-green-100 text-green-700 border-green-200'
+                    showFraudFlag ? 'bg-red-100 text-red-700 border-red-200' : 'bg-green-100 text-green-700 border-green-200'
                   }`}
                 >
-                  {isFraud ? 'Fraud Flagged' : 'No Fraud Flag'}
+                  {showFraudFlag ? 'Fraud Flagged' : 'No Fraud Flag'}
                 </span>
               </div>
             </div>
 
             <div className="grid sm:grid-cols-3 gap-4">
               <div className="bg-white/80 rounded-xl p-4 border border-gray-200">
-                <p className="text-xs text-gray-500">Combined Score</p>
-                <p className="text-lg font-semibold text-gray-900">{combinedScore.toFixed(2)} / 100</p>
-              </div>
-              <div className="bg-white/80 rounded-xl p-4 border border-gray-200">
-                <p className="text-xs text-gray-500">Rule Fraud Score</p>
-                <p className="text-lg font-semibold text-gray-900">{Number(analysis?.fraud_score || 0).toFixed(2)} / 100</p>
+                <p className="text-xs text-gray-500">Final Risk Score</p>
+                <p className="text-lg font-semibold text-gray-900">{riskScore.toFixed(2)} / 100</p>
               </div>
               <div className="bg-white/80 rounded-xl p-4 border border-gray-200">
                 <p className="text-xs text-gray-500">Transactions Extracted</p>
@@ -298,27 +289,6 @@ export default function RiskAnalysisDashboard({ analysis }) {
           </div>
         </div>
 
-        {/* ML Model Breakdown */}
-        <div className="mt-4 flex items-center gap-4 px-2">
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Bot className="w-3.5 h-3.5" />
-            <span className="font-medium">ML Model Breakdown:</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium bg-white/80 border border-gray-200 text-gray-700">
-              ML Score: <span className="font-semibold text-gray-900">{formatPct(mlScore)}</span>
-            </span>
-            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium border ${
-              String(analysis?.ml_risk_level || '').toUpperCase() === 'HIGH'
-                ? 'bg-red-50 border-red-200 text-red-700'
-                : String(analysis?.ml_risk_level || '').toUpperCase() === 'MEDIUM'
-                  ? 'bg-amber-50 border-amber-200 text-amber-700'
-                  : 'bg-green-50 border-green-200 text-green-700'
-            }`}>
-              ML Risk Level: <span className="font-semibold">{String(analysis?.ml_risk_level || 'N/A').toUpperCase()}</span>
-            </span>
-          </div>
-        </div>
       </section>
 
       <section className="grid lg:grid-cols-2 gap-6">
@@ -350,6 +320,18 @@ export default function RiskAnalysisDashboard({ analysis }) {
             <div className="flex justify-between"><span className="text-gray-500">Generated At</span><span className="font-medium text-gray-900">{report.timestamp || 'N/A'}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Pages</span><span className="font-medium text-gray-900">{insights.pages ?? 'N/A'}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">OCR Pages</span><span className="font-medium text-gray-900">{insights.ocr_pages ?? 'N/A'}</span></div>
+            <div className="pt-3 border-t border-gray-200" />
+            <div className="flex justify-between"><span className="text-gray-500">Pipeline</span><span className="font-medium text-gray-900">{modelMeta?.pipeline_version || 'N/A'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Model Artifact</span><span className="font-medium text-gray-900 truncate max-w-[60%] text-right">{modelMeta?.model_artifact || 'N/A'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Expected Features</span><span className="font-medium text-gray-900">{expectedFeatureCount || 'N/A'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Provided Features</span><span className="font-medium text-gray-900">{providedFeatureCount || 'N/A'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Alignment Action</span><span className="font-medium text-gray-900 uppercase">{alignmentAction}</span></div>
+            <div className="flex items-center justify-between rounded-lg px-2 py-1.5 border border-gray-200 bg-gray-50">
+              <span className="text-gray-600">Feature Shape Health</span>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isFeatureAligned ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-amber-100 text-amber-700 border border-amber-200'}`}>
+                {isFeatureAligned ? 'MATCHED' : 'AUTO-ALIGNED'}
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -358,7 +340,7 @@ export default function RiskAnalysisDashboard({ analysis }) {
       <section className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
         <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200">
           <p className="text-xs font-semibold text-indigo-700 mb-1">Recommendation</p>
-          <p className="text-sm text-indigo-900">{report.recommendation || 'No recommendation generated.'}</p>
+          <p className="text-sm text-indigo-900">{safeRecommendation}</p>
         </div>
       </section>
 
@@ -399,26 +381,7 @@ export default function RiskAnalysisDashboard({ analysis }) {
       </section>
 
       {/* ---- Charts Section ---- */}
-      <section className="grid lg:grid-cols-2 gap-6">
-        {/* Score Breakdown Doughnut */}
-        <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-lg transition-shadow">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-indigo-600" /> Score Breakdown
-          </h3>
-          <div className="h-64">
-            <Doughnut data={scoreBreakdownData} options={scoreBreakdownOptions} />
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="text-center p-3 rounded-xl bg-indigo-50 border border-indigo-100">
-              <p className="text-xs text-indigo-600 font-semibold">ML Risk</p>
-              <p className="text-xl font-bold text-indigo-700">{formatPct(mlScore)}</p>
-            </div>
-            <div className="text-center p-3 rounded-xl bg-cyan-50 border border-cyan-100">
-              <p className="text-xs text-cyan-600 font-semibold">Rule Score</p>
-              <p className="text-xl font-bold text-cyan-700">{Number(analysis?.fraud_score || 0).toFixed(1)}</p>
-            </div>
-          </div>
-        </div>
+      <section className="grid gap-6">
 
         {/* Transaction Bar Chart */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-lg transition-shadow">

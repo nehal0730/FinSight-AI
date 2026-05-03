@@ -1,5 +1,5 @@
 import unittest
-from app.services.fraud import FeatureEngineer, FraudDetector
+from app.services.fraud import FeatureEngineer, FraudDetector, RiskExplainer
 
 
 class FeatureEngineeringTests(unittest.TestCase):
@@ -36,8 +36,8 @@ class FeatureEngineeringTests(unittest.TestCase):
 
         features = FeatureEngineer.engineer_features(transactions)
 
-        # Should detect high-risk merchants
-        assert features["high_risk_merchants"] == 3.0
+        # Crypto is treated as sensitive, not automatically high-risk.
+        assert features["high_risk_merchants"] == 2.0
         assert features["total_transactions"] == 4.0
 
     def test_engineer_features_empty_transactions(self):
@@ -81,11 +81,32 @@ class FeatureEngineeringTests(unittest.TestCase):
         # Should be low risk
         assert score < 10.0
 
+    def test_recurring_emi_payments_are_treated_as_normal(self):
+        """Recurring EMI-style payments should not trigger repeat-merchant fraud scoring."""
+        transactions = [
+            {"date": "2026-01-01", "amount": 6000.0, "type": "credit", "merchant": "Salary"},
+            {"date": "2026-01-02", "amount": 800.0, "type": "debit", "merchant": "EMI Payment"},
+            {"date": "2026-01-03", "amount": 274.0, "type": "debit", "merchant": "EMI Payment"},
+            {"date": "2026-01-04", "amount": 200.0, "type": "debit", "merchant": "EMI Payment"},
+            {"date": "2026-01-05", "amount": 221.0, "type": "debit", "merchant": "EMI Payment"},
+            {"date": "2026-01-06", "amount": 126.0, "type": "debit", "merchant": "EMI Payment"},
+            {"date": "2026-01-07", "amount": 800.0, "type": "debit", "merchant": "EMI Payment"},
+            {"date": "2026-01-08", "amount": 281.0, "type": "debit", "merchant": "EMI Payment"},
+        ]
+
+        features = FeatureEngineer.engineer_features(transactions)
+        score = FeatureEngineer.compute_fraud_score(features)
+
+        assert features["legitimate_merchants"] == 8.0
+        assert features["rapid_same_merchant_transactions"] == 0.0
+        assert score < 10.0
+
     def test_merchant_risk_detection(self):
         """Test merchant-specific risk classification."""
         assert FeatureEngineer._is_high_risk_merchant("CasinoXYZ") is True
         assert FeatureEngineer._is_high_risk_merchant("Casino Royal") is True
-        assert FeatureEngineer._is_high_risk_merchant("Bitcoin Exchange") is True
+        assert FeatureEngineer._is_high_risk_merchant("Bitcoin Exchange") is False
+        assert FeatureEngineer._is_sensitive_merchant("Bitcoin Exchange") is True
 
         assert FeatureEngineer._is_legitimate_merchant("Salary") is True
         assert FeatureEngineer._is_legitimate_merchant("GroceryMart") is True
@@ -131,7 +152,7 @@ class FeatureEngineeringTests(unittest.TestCase):
         assert expected_keys.issubset(set(features.keys()))
 
     def test_hybrid_verdict_uses_both_signals(self):
-        """Hybrid verdict should elevate risk when both signals are moderately suspicious."""
+        """Hybrid verdict should elevate to medium risk when signals are moderately suspicious."""
         result = FraudDetector.combine_fraud_verdict(
             fraud_score=30.0,
             anomaly_score=0.63,
@@ -140,7 +161,7 @@ class FeatureEngineeringTests(unittest.TestCase):
 
         assert result["combined_score"] > 0
         assert result["is_fraud"] is True
-        assert result["risk_level"] == "high"
+        assert result["risk_level"] == "medium"
 
     def test_hybrid_verdict_low_when_both_low(self):
         """Hybrid verdict should stay low for clearly normal behavior."""
@@ -152,6 +173,23 @@ class FeatureEngineeringTests(unittest.TestCase):
 
         assert result["is_fraud"] is False
         assert result["risk_level"] == "low"
+
+    def test_account_takeover_pattern_escalates_high(self):
+        """Salary followed by ATM / transfer / wire activity should be treated as account takeover risk."""
+        transactions = [
+            {"date": "2026-01-01", "amount": 7000.0, "type": "credit", "merchant": "Salary"},
+            {"date": "2026-01-02", "amount": 200.0, "type": "debit", "merchant": "Normal Spend"},
+            {"date": "2026-01-03", "amount": 200.0, "type": "debit", "merchant": "Normal Spend"},
+            {"date": "2026-01-04", "amount": 200.0, "type": "debit", "merchant": "Normal Spend"},
+            {"date": "2026-01-05", "amount": 2000.0, "type": "debit", "merchant": "ATM Withdrawal"},
+            {"date": "2026-01-06", "amount": 2500.0, "type": "debit", "merchant": "Unknown Transfer"},
+            {"date": "2026-01-07", "amount": 1800.0, "type": "debit", "merchant": "Wire Transfer Intl"},
+        ]
+
+        takeover = RiskExplainer.detect_account_takeover_signal(transactions)
+
+        assert takeover["score"] >= 70.0
+        assert "account takeover" in takeover["reason"].lower()
 
 
 if __name__ == "__main__":

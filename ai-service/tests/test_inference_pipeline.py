@@ -38,8 +38,8 @@ class TestInferencePipeline(unittest.TestCase):
         engineer = FeatureEngineer()
         features = engineer.engineer_features(transactions)
         
-        # Verify features extracted (updated to 28 features)
-        self.assertEqual(len(features), 28)
+        # Verify features extracted (30-feature vector for model compatibility)
+        self.assertEqual(len(features), 30)
         self.assertTrue(all(isinstance(v, (int, float)) for v in features.values()))
         
         # Score

@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Send, RefreshCw, Bot, Pin } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const AI_BASE_URL = import.meta.env.VITE_AI_URL || 'http://localhost:8000';
+
 export default function Chat() {
   const [messages, setMessages] = useState([
     {
@@ -32,11 +35,9 @@ export default function Chat() {
   const fetchDocuments = async () => {
     try {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
-      if (!token) return;
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-      const res = await axios.get('http://localhost:5000/query/documents', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(`${AI_BASE_URL}/query/documents`, headers ? { headers } : undefined);
 
       if (res.data.success && res.data.data?.documents) {
         const docList = res.data.data.documents;
@@ -72,7 +73,7 @@ export default function Chat() {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
       
       const res = await axios.post(
-        'http://localhost:5000/query',
+        `${API_BASE_URL}/query`,
         {
           query: input,
           document_id: selectedDoc,

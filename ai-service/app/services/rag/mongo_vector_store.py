@@ -199,6 +199,20 @@ class MongoVectorStore:
         except Exception as e:
             api_logger.error(f"Error checking document existence: {e}")
             return False
+
+    def list_documents(self) -> List[str]:
+        """List all documents that are actually indexed in MongoDB."""
+        try:
+            collection = self.db["vector_indexes"]
+            docs = collection.find({}, {"document_id": 1, "_id": 0})
+            return sorted(
+                doc["document_id"]
+                for doc in docs
+                if doc.get("document_id")
+            )
+        except Exception as e:
+            api_logger.error(f"Error listing vector store documents: {e}")
+            return []
     
     def _load_document(self, document_id: str) -> bool:
         """Load document index and metadata from MongoDB"""

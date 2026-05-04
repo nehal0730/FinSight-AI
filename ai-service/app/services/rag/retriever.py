@@ -214,6 +214,21 @@ class Retriever:
         
         if not filtered:
             api_logger.warning(f"No chunks passed threshold {self.config.similarity_threshold}")
+            # Fallback: if nothing passed the threshold, use the top raw results (no threshold)
+            if raw_results:
+                api_logger.info("Falling back to top raw vector results without threshold")
+                # Convert to RetrievedChunk and re-rank as usual
+                retrieved_chunks = FinancialReRanker.rerank(
+                    raw_results,
+                    query,
+                    enabled=self.config.rerank_enabled
+                )
+                top_results = retrieved_chunks[:top_k]
+                api_logger.info(
+                    f"Fallback retrieved {len(top_results)} chunks for query in {document_id} "
+                    f"(scores: {[f'{r.final_score:.3f}' for r in top_results]})"
+                )
+                return top_results
             return []
         
         api_logger.debug(f"Filtered to {len(filtered)} chunks above threshold")

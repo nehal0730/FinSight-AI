@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.pyc
+logs
+storage
+uploads
+tests
+frontend
+backend
+node_modules

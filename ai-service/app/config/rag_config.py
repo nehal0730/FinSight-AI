@@ -8,6 +8,7 @@ Design Philosophy:
 - Validated at runtime
 """
 
+import os
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -56,7 +57,7 @@ class EmbeddingConfig:
     - Cache embeddings to avoid re-processing same doc
     - HuggingFace models run locally, no API key needed
     """
-    model: EmbeddingModel = EmbeddingModel.HUGGINGFACE_MPNET  # 768 dims, best quality
+    model: EmbeddingModel = EmbeddingModel.HUGGINGFACE_MINILM  # 384 dims, lighter for free hosting
     api_key: str = ""  # Not used for HuggingFace (local inference)
     cache_embeddings: bool = True
     batch_size: int = 100  # Process 100 chunks at once
@@ -154,7 +155,12 @@ class RAGConfigPresets:
         """Balanced production settings (recommended) - FREE TIER"""
         config = RAGSystemConfig()
         config.chunking = ChunkingConfig(chunk_size=500, chunk_overlap=200)
-        config.embedding = EmbeddingConfig(model=EmbeddingModel.HUGGINGFACE_MPNET)
+        embedding_model_name = os.getenv("EMBEDDING_MODEL") or os.getenv("RAG_EMBEDDING_MODEL")
+        try:
+            embedding_model = EmbeddingModel(embedding_model_name) if embedding_model_name else EmbeddingModel.HUGGINGFACE_MINILM
+        except ValueError:
+            embedding_model = EmbeddingModel.HUGGINGFACE_MINILM
+        config.embedding = EmbeddingConfig(model=embedding_model)
         config.retrieval = RetrievalConfig(top_k=5, similarity_threshold=0.35)
         config.llm = LLMConfig(provider="groq", model="llama-3.1-8b-instant", temperature=0.3, max_tokens=1500)
         return config

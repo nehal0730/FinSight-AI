@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Sparkles, Eye, EyeOff, Circle, Square } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Signup() {
   const [name, setName] = useState('');

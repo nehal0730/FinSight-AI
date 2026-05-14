@@ -5,6 +5,8 @@ import { AlertTriangle, ArrowLeft, FileSearch, RefreshCw, Trash2, Sparkles } fro
 import RiskAnalysisDashboard from '../components/RiskAnalysisDashboard';
 import { clearRiskHistory, getRiskHistoryForUser, saveRiskAnalysis } from '../utils/riskStorage';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function Dashboard() {
   const [riskAnalysis, setRiskAnalysis] = useState(null);
   const [riskHistory, setRiskHistory] = useState([]);
@@ -23,7 +25,7 @@ export default function Dashboard() {
         
         if (token) {
           try {
-            const res = await axios.get('http://localhost:5000/query/documents', {
+            const res = await axios.get(`${API_BASE_URL}/query/documents`, {
               headers: { Authorization: `Bearer ${token}` }
             });
             
@@ -124,7 +126,7 @@ export default function Dashboard() {
       
       // Call backend to regenerate with LLM
       const res = await axios.post(
-        'http://localhost:5000/risk-analysis/regenerate',
+        `${API_BASE_URL}/risk-analysis/regenerate`,
         { 
           documentId: selectedDocument,
           analysisId: selectedId

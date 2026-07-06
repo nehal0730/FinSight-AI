@@ -3,7 +3,6 @@ import axios from 'axios';
 import { Send, RefreshCw, Bot, Pin } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const AI_BASE_URL = import.meta.env.VITE_AI_URL || 'http://localhost:8000';
 
 export default function Chat() {
   const [messages, setMessages] = useState([
@@ -37,7 +36,7 @@ export default function Chat() {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
       const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-      const res = await axios.get(`${AI_BASE_URL}/query/documents`, headers ? { headers } : undefined);
+      const res = await axios.get(`${API_BASE_URL}/query/documents`, headers ? { headers } : undefined);
 
       if (res.data.success && res.data.data?.documents) {
         const docList = res.data.data.documents;

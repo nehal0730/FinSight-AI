@@ -76,9 +76,17 @@ export default function Upload() {
         },
       });
 
-      const [uploadRes, riskRes] = await Promise.all([uploadPromise, riskPromise]);
+      const uploadRes = await uploadPromise;
+
+      let riskRes = null;
+      try {
+        riskRes = await riskPromise;
+      } catch (riskErr) {
+        console.warn('Risk analysis request failed after upload completed:', riskErr);
+      }
+
       localStorage.setItem('analysisResult', JSON.stringify(uploadRes.data));
-      const riskRecord = buildRiskRecord(file, riskRes.data, uploadRes.data);
+  const riskRecord = buildRiskRecord(file, riskRes?.data, uploadRes.data);
       await saveRiskAnalysis(riskRecord);
       localStorage.setItem('currentRiskAnalysis', JSON.stringify(riskRecord));
 

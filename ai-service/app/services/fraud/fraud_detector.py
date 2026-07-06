@@ -9,6 +9,7 @@ This service provides:
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -29,10 +30,17 @@ class FraudDetector:
 
     def __init__(
         self,
-        model_path: str = "models/fraud_model.pkl",
+        model_path: str = None,
         thresholds: RiskThresholds = RiskThresholds(),
     ) -> None:
-        self.model_path = Path(model_path)
+        # Resolve paths relative to the ai-service directory
+        if model_path is None:
+            model_path = os.getenv("FRAUD_MODEL_PATH", None)
+            if model_path is None:
+                base_dir = Path(__file__).resolve().parents[2]  # ai-service/
+                model_path = base_dir / "models" / "fraud_model.pkl"
+        
+        self.model_path = Path(model_path) if not isinstance(model_path, Path) else model_path
         self.thresholds = thresholds
         self.model = self._load_model(self.model_path)
 
@@ -40,7 +48,10 @@ class FraudDetector:
     def _load_model(model_path: Path) -> Any:
         """Load a serialized sklearn-compatible model from disk."""
         if not model_path.exists():
-            raise FileNotFoundError(f"Model not found: {model_path}")
+            raise FileNotFoundError(
+                f"Model not found at: {model_path.absolute()}\n"
+                f"CWD: {os.getcwd()}"
+            ) 
 
         import joblib
 

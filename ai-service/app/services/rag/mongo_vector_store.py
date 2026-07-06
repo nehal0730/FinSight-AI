@@ -12,6 +12,7 @@ import json
 import pickle
 from pathlib import Path
 from typing import List, Optional, Tuple
+from datetime import datetime
 import numpy as np
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
@@ -102,8 +103,13 @@ class MongoVectorStore:
             vectors_array = np.array(embedding_vectors, dtype=np.float32)
             index.add(vectors_array)
             
-            # Serialize index to bytes
+            # Serialize index to bytes (ensure native bytes for MongoDB)
             index_bytes = faiss.serialize_index(index)
+            if isinstance(index_bytes, np.ndarray):
+                index_bytes = index_bytes.tobytes()
+            elif isinstance(index_bytes, memoryview):
+                index_bytes = bytes(index_bytes)
+
             chunks_bytes = pickle.dumps(chunks)
             
             # Store in MongoDB
@@ -118,7 +124,7 @@ class MongoVectorStore:
                         "metadata": metadata_list,
                         "chunks_data": chunks_bytes,
                         "embedding_dim": self.embedding_dim,
-                        "updated_at": np.datetime64('now')
+                        "updated_at": datetime.utcnow()
                     }
                 },
                 upsert=True

@@ -21,11 +21,24 @@ class FraudDetectionInference:
 
     def __init__(
         self,
-        model_path: str = os.getenv("FRAUD_MODEL_PATH", "models/fraud_model_engineered.pkl"),
-        scaler_path: str = os.getenv("FRAUD_SCALER_PATH", "models/scaler_engineered.pkl"),
+        model_path: str = None,
+        scaler_path: str = None,
     ):
-        self.model_path = Path(model_path)
-        self.scaler_path = Path(scaler_path)
+        # Resolve paths relative to the ai-service directory
+        base_dir = Path(__file__).resolve().parents[1]  # ai-service/
+        
+        if model_path is None:
+            model_path = os.getenv("FRAUD_MODEL_PATH", None)
+            if model_path is None:
+                model_path = base_dir / "models" / "fraud_model_engineered.pkl"
+        
+        if scaler_path is None:
+            scaler_path = os.getenv("FRAUD_SCALER_PATH", None)
+            if scaler_path is None:
+                scaler_path = base_dir / "models" / "scaler_engineered.pkl"
+        
+        self.model_path = Path(model_path) if not isinstance(model_path, Path) else model_path
+        self.scaler_path = Path(scaler_path) if not isinstance(scaler_path, Path) else scaler_path
         self.model = None
         self.scaler = None
         self.last_feature_alignment_action = "none"
@@ -35,9 +48,17 @@ class FraudDetectionInference:
     def _load_artifacts(self):
         """Load trained model and scaler from disk."""
         if not self.model_path.exists():
-            raise FileNotFoundError(f"Model not found: {self.model_path}")
+            raise FileNotFoundError(
+                f"Model not found at: {self.model_path.absolute()}\n"
+                f"CWD: {os.getcwd()}\n"
+                f"ai-service base dir: {Path(__file__).resolve().parents[1]}"
+            )
         if not self.scaler_path.exists():
-            raise FileNotFoundError(f"Scaler not found: {self.scaler_path}")
+            raise FileNotFoundError(
+                f"Scaler not found at: {self.scaler_path.absolute()}\n"
+                f"CWD: {os.getcwd()}\n"
+                f"ai-service base dir: {Path(__file__).resolve().parents[1]}"
+            )
 
         import joblib
 

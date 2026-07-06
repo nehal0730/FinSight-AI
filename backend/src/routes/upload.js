@@ -1,7 +1,6 @@
 const express = require("express");
 const axios = require("axios"); //for making HTTP requests
 const FormData = require("form-data"); //to create form data for file upload
-const { Readable } = require("stream");
 const upload = require("../middleware/upload.js");
 const auth = require("../middleware/auth");
 const logger = require("../config/logger");
@@ -19,9 +18,8 @@ router.post("/", auth, upload.single("file"), async (req, res, next) => {
 
     // Stream file directly from memory buffer (no disk write)
     const formData = new FormData();
-    const bufferStream = Readable.from(req.file.buffer);
     // Preserve filename and MIME type so the AI service validates it as a PDF.
-    formData.append("file", bufferStream, {
+    formData.append("file", req.file.buffer, {
       filename: req.file.originalname,
       contentType: req.file.mimetype || "application/pdf",
       knownLength: req.file.size,

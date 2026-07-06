@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 const logger = require("../config/logger");
 const { AI_SERVICE_URL } = require("../config/env");
 const Document = require("../models/Document");
+const RiskAnalysis = require("../models/RiskAnalysis");
 
 const router = express.Router();
 
@@ -41,23 +42,47 @@ router.post("/", auth, async (req, res, next) => {
 
     logger.info(`Query request: "${query}" for document: ${document_id}`);
 
-    // Forward query to AI service
-    const aiResponse = await axios.post(
-      `${AI_SERVICE_URL}/query/query`,
-      {
-        query,
-        document_id,
-        top_k: top_k || 5
-      }
-    );
+    try {
+      // Forward query to AI service
+      const aiResponse = await axios.post(
+        `${AI_SERVICE_URL}/query/query`,
+        {
+          query,
+          document_id,
+          top_k: top_k || 5,
+        },
+        { timeout: 30000 }
+      );
 
-    logger.info(`Query completed for: ${document_id}`);
+      logger.info(`Query completed for: ${document_id}`);
 
-    res.status(200).json({
-      success: true,
-      data: aiResponse.data,
-      error: null
-    });
+      return res.status(200).json({
+        success: true,
+        data: aiResponse.data,
+        error: null,
+      });
+    } catch (aiErr) {
+      const detail = aiErr?.response?.data?.detail || aiErr?.response?.data?.error || aiErr?.message || "AI service unavailable";
+      logger.warn(`AI query unavailable for ${document_id}. Falling back to demo answer. Detail: ${detail}`);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          answer: `Demo answer for document ${document_id}: "${query}"\n\nThe AI index is currently unavailable, so this is a placeholder response. You can still demonstrate the chat UI flow end-to-end.`,
+          sources: [
+            {
+              document_id,
+              excerpt: "Demo source snippet from locally saved analysis.",
+              confidence: 0.71,
+            },
+          ],
+          model: "demo-mode",
+          processing_time_ms: 120,
+          usingDemoData: true,
+        },
+        error: null,
+      });
+    }
 
   } catch (err) {
     if (err.response) {
@@ -100,16 +125,48 @@ router.get("/documents", auth, async (req, res, next) => {
       logger.info(`✓ Found ${userDocuments.length} documents for this user`);
     }
 
+    // Fallback: if no Document records exist, derive document IDs from saved risk analysis history.
+    if (userDocuments.length === 0) {
+      const historyFilter = req.user.role === "admin" ? {} : { userId: req.user.id };
+      const history = await RiskAnalysis.find(historyFilter)
+        .sort({ updatedAt: -1 })
+        .lean();
+
+      const fallbackDocs = [];
+      for (const item of history) {
+        const fromUpload = item?.uploadResponse?.data?.aiResponse?.storage_ref?.id;
+        const fallbackId = fromUpload || item?.recordId;
+        if (!fallbackId) continue;
+        fallbackDocs.push({
+          documentId: fallbackId,
+          fileName: item?.fileName || "Demo document",
+          uploaded_at: item?.updatedAt || item?.createdAt,
+          fileSize: 0,
+          filePath: null,
+        });
+      }
+
+      // De-duplicate document IDs while preserving order.
+      const seen = new Set();
+      userDocuments = fallbackDocs.filter((doc) => {
+        if (seen.has(doc.documentId)) return false;
+        seen.add(doc.documentId);
+        return true;
+      });
+
+      logger.info(`✓ Using ${userDocuments.length} fallback documents from risk history`);
+    }
+
     // Return just the document IDs for the Chat page (backward compatibility)
-    const documentIds = userDocuments.map(doc => doc.documentId);
-    
+    const documentIds = userDocuments.map((doc) => doc.documentId);
+
     // Also return full document data for dashboard usage
-    const documentsWithMetadata = userDocuments.map(doc => ({
+    const documentsWithMetadata = userDocuments.map((doc) => ({
       documentId: doc.documentId,
       fileName: doc.fileName,
       uploadedAt: doc.uploaded_at,
       fileSize: doc.fileSize,
-      hasPdf: !!doc.filePath
+      hasPdf: !!doc.filePath,
     }));
     
     logger.info(`✓ Returning ${documentIds.length} document IDs`);

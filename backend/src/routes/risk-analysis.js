@@ -1,7 +1,6 @@
 const express = require("express");
 const axios = require("axios");
 const FormData = require("form-data");
-const { Readable } = require("stream");
 const auth = require("../middleware/auth");
 const logger = require("../config/logger");
 const { AI_SERVICE_URL } = require("../config/env");
@@ -173,8 +172,7 @@ router.post("/regenerate", auth, async (req, res, next) => {
 
     // Re-run risk analysis against the PDF with use_llm=true
     const formData = new FormData();
-    const bufferStream = Readable.from(pdfBuffer);
-    formData.append("file", bufferStream, {
+    formData.append("file", pdfBuffer, {
       filename: doc.fileName,
       contentType: "application/pdf",
       knownLength: pdfBuffer.length,

@@ -1,5 +1,6 @@
 # Python cache and artifacts
 __pycache__/
+npm-cache/
 *.py[cod]
 *$py.class
 *.so

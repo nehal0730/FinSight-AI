@@ -53,6 +53,22 @@ export async function clearRiskHistory() {
   }
 }
 
+export async function deleteRiskAnalysis(record) {
+  if (!record || typeof record !== 'object' || !record.id) return false;
+  try {
+    await axios.delete(`${API_BASE_URL}/risk-analysis/${encodeURIComponent(record.id)}`, {
+      headers: getAuthHeaders(),
+      data: {
+        documentId: record.uploadResponse?.data?.aiResponse?.storage_ref?.id || null,
+      },
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to delete risk analysis from server:', err);
+    return false;
+  }
+}
+
 export function buildRiskRecord(file, riskResponse, uploadResponse = null) {
   const now = new Date();
   const fallbackName = file?.name || 'unknown.pdf';

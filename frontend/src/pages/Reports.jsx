@@ -7,7 +7,7 @@ import {
   ExternalLink, FileDown, Search, X, Clock,
   ChevronDown, ChevronUp, ArrowUpDown, Filter, LayoutGrid, List
 } from 'lucide-react';
-import { getRiskHistoryForUser, clearRiskHistory, saveRiskAnalysis } from '../utils/riskStorage';
+import { getRiskHistoryForUser, clearRiskHistory, saveRiskAnalysis, deleteRiskAnalysis } from '../utils/riskStorage';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -191,6 +191,33 @@ export default function Reports() {
       await clearRiskHistory();
       setReports([]);
       setExpandedId(null);
+    }
+  };
+
+  const handleDeleteReport = async (report) => {
+    if (!report) return;
+
+    const confirmed = window.confirm(`Delete ${report.fileName || 'this report'}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    const deleted = await deleteRiskAnalysis(report);
+    if (!deleted) {
+      alert('Failed to delete report. Please try again.');
+      return;
+    }
+
+    setReports(prev => prev.filter(r => r.id !== report.id));
+    setExpandedId(prev => (prev === report.id ? null : prev));
+
+    if (localStorage.getItem('currentRiskAnalysis')) {
+      try {
+        const current = JSON.parse(localStorage.getItem('currentRiskAnalysis'));
+        if (current?.id === report.id) {
+          localStorage.removeItem('currentRiskAnalysis');
+        }
+      } catch {
+        localStorage.removeItem('currentRiskAnalysis');
+      }
     }
   };
 
@@ -470,6 +497,12 @@ export default function Reports() {
               <Sparkles className="w-3.5 h-3.5" /> {regeneratingId === report.id ? 'Generating...' : 'AI Summary'}
             </button>
           )}
+          <button
+            onClick={() => handleDeleteReport(report)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 border border-red-200 text-red-700 text-xs font-medium rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </button>
         </div>
         <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-4 text-[11px] text-gray-400">
           <span>ID: <span className="font-mono">{report.id?.substring(0, 16)}...</span></span>
@@ -872,6 +905,13 @@ export default function Reports() {
                               title="Export TXT"
                             >
                               <FileText className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteReport(report)}
+                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete report"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>

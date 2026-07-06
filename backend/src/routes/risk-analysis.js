@@ -6,7 +6,7 @@ const logger = require("../config/logger");
 const { AI_SERVICE_URL } = require("../config/env");
 const RiskAnalysis = require("../models/RiskAnalysis");
 const Document = require("../models/Document");
-const { downloadPDF } = require("../utils/mongoStorage");
+const { downloadPDF, deletePDF } = require("../utils/mongoStorage");
 
 const router = express.Router();
 
@@ -235,6 +235,66 @@ router.post("/regenerate", auth, async (req, res, next) => {
     }
 
     logger.error(`Regeneration error: ${err.message}`);
+    next(err);
+  }
+});
+
+/**
+ * Delete a specific risk analysis record and linked PDF/document when available
+ * DELETE /risk-analysis/:analysisId
+ * Body: { documentId?: string }
+ */
+router.delete("/:analysisId", auth, async (req, res, next) => {
+  try {
+    const { analysisId } = req.params;
+    const requestedDocumentId = req.body?.documentId;
+
+    const record = await RiskAnalysis.findOne({ recordId: analysisId });
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: "Risk analysis record not found"
+      });
+    }
+
+    if (req.user.role !== "admin" && String(record.userId) !== String(req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        error: "Access denied"
+      });
+    }
+
+    const savedDocumentId = record.uploadResponse?.data?.aiResponse?.storage_ref?.id;
+    const resolvedDocumentId = requestedDocumentId || savedDocumentId;
+
+    if (resolvedDocumentId) {
+      const doc = await Document.findOne({ documentId: resolvedDocumentId });
+      if (doc) {
+        if (doc.gridFSFileId) {
+          const gridDeleteResult = await deletePDF(doc.gridFSFileId.toString());
+          if (!gridDeleteResult.success) {
+            logger.error(`GridFS delete failed for ${resolvedDocumentId}: ${gridDeleteResult.error}`);
+          }
+        }
+
+        await Document.deleteOne({ documentId: resolvedDocumentId });
+      }
+    }
+
+    await RiskAnalysis.deleteOne({ recordId: analysisId });
+
+    logger.info(`Risk analysis deleted: ${analysisId} by user ${req.user.id}`);
+
+    res.json({
+      success: true,
+      data: {
+        deleted: true,
+        analysisId,
+      },
+      error: null,
+    });
+  } catch (err) {
+    logger.error(`Failed to delete risk analysis: ${err.message}`);
     next(err);
   }
 });

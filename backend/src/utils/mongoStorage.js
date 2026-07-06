@@ -81,7 +81,7 @@ async function downloadPDF(fileId) {
     return new Promise((resolve, reject) => {
       const chunks = [];
       const downloadStream = bucket.openDownloadStream(
-        mongoose.Types.ObjectId(fileId)
+        new mongoose.Types.ObjectId(fileId)
       );
 
       downloadStream.on("error", (err) => {
@@ -117,7 +117,7 @@ async function deletePDF(fileId) {
   }
 
   try {
-    await bucket.delete(mongoose.Types.ObjectId(fileId));
+    await bucket.delete(new mongoose.Types.ObjectId(fileId));
     logger.info(`✓ PDF deleted from GridFS: ${fileId}`);
     return { success: true };
   } catch (err) {
@@ -140,7 +140,7 @@ async function getFileInfo(fileId) {
   try {
     const files = await mongoose.connection.db
       .collection("pdfs.files")
-      .find({ _id: mongoose.Types.ObjectId(fileId) })
+      .find({ _id: new mongoose.Types.ObjectId(fileId) })
       .toArray();
 
     if (files.length === 0) {

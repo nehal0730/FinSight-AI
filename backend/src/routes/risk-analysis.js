@@ -127,8 +127,17 @@ router.post("/regenerate", auth, async (req, res, next) => {
 
     logger.info(`Regenerating analysis with LLM - documentId: ${documentId}, analysisId: ${analysisId}`);
 
+    let resolvedDocumentId = documentId;
+    if (!resolvedDocumentId || resolvedDocumentId === analysisId) {
+      const savedAnalysis = await RiskAnalysis.findOne({ recordId: analysisId }).lean();
+      const fallbackDocumentId = savedAnalysis?.uploadResponse?.data?.aiResponse?.storage_ref?.id;
+      if (fallbackDocumentId) {
+        resolvedDocumentId = fallbackDocumentId;
+      }
+    }
+
     // Locate the saved PDF via Document record
-    const doc = await Document.findOne({ documentId });
+    const doc = await Document.findOne({ documentId: resolvedDocumentId });
     if (!doc) {
       return res.status(404).json({
         success: false,

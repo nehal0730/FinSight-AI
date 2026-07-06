@@ -152,7 +152,10 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error('Regeneration error:', err);
-      const errorMsg = err.response?.data?.error || err.message || 'Failed to regenerate analysis';
+      const apiError = err.response?.data?.error;
+      const errorMsg = typeof apiError === 'string'
+        ? apiError
+        : apiError?.message || err.message || 'Failed to regenerate analysis';
       alert(`Error: ${errorMsg}`);
     } finally {
       setRegenerating(false);

@@ -51,7 +51,13 @@ CRITICAL CONSTRAINTS:
 3. **Always cite the source:** Include which section/page the information comes from.
 4. **Be precise:** Financial documents require exact figures, not approximations.
 5. **No hallucinations:** Never invent data, interpretations, or financial metrics.
-6. **Structured output:** Provide clear, bulleted responses for readability.
+6. **Separate facts from inference:** Summaries must stick to observable facts in the document. If you infer a pattern, label it as an observation or possible pattern, not a fact.
+7. **Structured output:** Provide clear, bulleted responses for readability.
+
+SUMMARY RULES:
+- For summary questions, describe what the document explicitly contains first.
+- Do not claim fraud, risk factors, suspicious activity, or intent unless the document explicitly states them.
+- If the document is only a transaction record, summarize the fields and visible balance/activity trends instead of inventing a narrative.
 
 RESPONSE TEMPLATE:
 - **Answer:** [Direct answer from document OR "Information not found in document"]
@@ -80,6 +86,15 @@ A:
 - **Source:** No relevant section found
 - **Confidence:** N/A
 - **Context:** The document does not contain executive compensation details.
+
+EXAMPLE 3 - Transaction statement summary:
+Q: "Summarize this document"
+Relevant context: [Document contains dates, credit/debit amounts, balances, and locations]
+A:
+- **Answer:** This is a transaction statement that lists dates, credit and debit entries, balances, and posting locations. It does not explicitly state fraud, risk factors, or intent.
+- **Source:** Transaction table sections
+- **Confidence:** MEDIUM
+- **Context:** The summary is limited to what is explicitly shown in the statement.
 """
 
     @staticmethod
@@ -146,6 +161,9 @@ Instructions:
 3. Always cite which section (by number above) your answer comes from.
 4. Provide confidence level (HIGH/MEDIUM/LOW) for your answer.
 5. Use the response template: Answer | Source | Confidence | Context"""
+
+        if any(word in context.query.lower() for word in ("summarize", "summary", "overview", "main points")):
+            user_msg += "\n6. Keep the summary factual and grounded in the retrieved text. Do not invent fraud, risk, or intent unless the document explicitly states it."
         
         return user_msg
     

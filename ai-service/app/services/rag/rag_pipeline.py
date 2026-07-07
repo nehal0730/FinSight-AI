@@ -604,18 +604,18 @@ class RAGPipeline:
                 seen.add(normalized)
                 unique_debits.append(description)
 
-            summary_bits = ["This looks like a transaction statement rather than a narrative risk report."]
+            summary_bits = ["This is a transaction statement that lists dates, credit and debit entries, balances, and posting locations."]
             if credits:
                 summary_bits.append(f"It shows credit activity such as {credits[0]}.")
             if unique_debits:
                 summary_bits.append(f"Recurring debit activity includes {', '.join(unique_debits[:6])}.")
             if any(token in query.lower() for token in ("risk", "factor", "concern")):
-                summary_bits.append("I do not see explicit risk-factor language in the statement rows.")
+                summary_bits.append("The statement rows do not explicitly state risk factors or fraud.")
 
             return " ".join(summary_bits)
 
         if any(token in query.lower() for token in ("risk", "factor", "concern")):
-            return "The document does not appear to list explicit risk factors in the extracted text."
+            return "The document does not explicitly list risk factors in the extracted text."
 
         first_lines = " ".join(lines[:3])
         if len(first_lines) > 420:

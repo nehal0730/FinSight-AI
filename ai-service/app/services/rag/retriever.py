@@ -193,9 +193,16 @@ class Retriever:
         """
         if top_k is None:
             top_k = self.config.top_k
+
+        document_embedding_dim = None
+        if hasattr(self.vector_store, "get_document_embedding_dim"):
+            document_embedding_dim = self.vector_store.get_document_embedding_dim(document_id)
         
         # Embed query
-        query_embedding = self.embedding_service.embed_query(query)
+        query_embedding = self.embedding_service.embed_query_for_dimension(
+            query,
+            document_embedding_dim,
+        )
         
         # Vector search
         raw_results = self.vector_store.search(

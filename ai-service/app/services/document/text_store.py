@@ -45,3 +45,11 @@ class TextStore:
             id=file_id,
             path=str(output_path),
         )
+
+    def load(self, file_id: str) -> str | None:
+        """Load previously saved extracted text by file ID."""
+        text_path = self.base_dir / f"{file_id}.txt"
+        if not text_path.exists():
+            return None
+
+        return text_path.read_text(encoding="utf-8")

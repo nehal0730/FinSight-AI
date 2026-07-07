@@ -16,5 +16,6 @@ const log = (level, message) => {
 
 module.exports = {
   info: (msg) => log("INFO", msg),
+  warn: (msg) => log("WARN", msg),
   error: (msg) => log("ERROR", msg)
 };

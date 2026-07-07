@@ -163,6 +163,13 @@ class MongoVectorStore:
         
         index = self._indexes[document_id]
         chunks = self._chunks[document_id]
+
+        if query_embedding.shape[-1] != index.d:
+            raise ValueError(
+                f"Embedding dimension mismatch for {document_id}: "
+                f"query={query_embedding.shape[-1]}, index={index.d}. "
+                "Re-index the document with the matching embedding model."
+            )
         
         distances, indices = index.search(query_norm, min(top_k, index.ntotal))
         
@@ -206,6 +213,16 @@ class MongoVectorStore:
             api_logger.error(f"Error checking document existence: {e}")
             return False
 
+    def get_document_embedding_dim(self, document_id: str) -> Optional[int]:
+        """Return the stored embedding dimension for a document if available."""
+        if document_id not in self._indexes:
+            self._load_document(document_id)
+
+        if document_id not in self._indexes:
+            return None
+
+        return self._indexes[document_id].d
+
     def list_documents(self) -> List[str]:
         """List all documents that are actually indexed in MongoDB."""
         try:
@@ -231,7 +248,18 @@ class MongoVectorStore:
                 return False
             
             # Deserialize index
-            index = faiss.deserialize_index(doc["index_data"])
+            index_data = doc.get("index_data")
+            if index_data is None:
+                api_logger.warning(f"Index data missing in MongoDB for {document_id}")
+                return False
+
+            if isinstance(index_data, memoryview):
+                index_data = index_data.tobytes()
+
+            if isinstance(index_data, bytes):
+                index_data = np.frombuffer(index_data, dtype=np.uint8)
+
+            index = faiss.deserialize_index(index_data)
             self._indexes[document_id] = index
             
             # Load metadata

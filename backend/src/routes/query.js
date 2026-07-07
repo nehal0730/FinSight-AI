@@ -8,6 +8,14 @@ const RiskAnalysis = require("../models/RiskAnalysis");
 
 const router = express.Router();
 
+function normalizeErrorMessage(errorValue, fallback) {
+  if (typeof errorValue === 'string') return errorValue;
+  if (errorValue && typeof errorValue === 'object') {
+    return errorValue.message || errorValue.detail || JSON.stringify(errorValue);
+  }
+  return fallback;
+}
+
 /**
  * Query indexed documents using RAG
  * POST /query
@@ -62,25 +70,15 @@ router.post("/", auth, async (req, res, next) => {
         error: null,
       });
     } catch (aiErr) {
-      const detail = aiErr?.response?.data?.detail || aiErr?.response?.data?.error || aiErr?.message || "AI service unavailable";
-      logger.warn(`AI query unavailable for ${document_id}. Falling back to demo answer. Detail: ${detail}`);
+      const detail = normalizeErrorMessage(
+        aiErr?.response?.data?.detail || aiErr?.response?.data?.error || aiErr?.message,
+        "AI service unavailable"
+      );
+      logger.error(`AI query unavailable for ${document_id}. Detail: ${detail}`);
 
-      return res.status(200).json({
-        success: true,
-        data: {
-          answer: `Demo answer for document ${document_id}: "${query}"\n\nThe AI index is currently unavailable, so this is a placeholder response. You can still demonstrate the chat UI flow end-to-end.`,
-          sources: [
-            {
-              document_id,
-              excerpt: "Demo source snippet from locally saved analysis.",
-              confidence: 0.71,
-            },
-          ],
-          model: "demo-mode",
-          processing_time_ms: 120,
-          usingDemoData: true,
-        },
-        error: null,
+      return res.status(aiErr?.response?.status || 502).json({
+        success: false,
+        error: detail,
       });
     }
 
@@ -90,7 +88,10 @@ router.post("/", auth, async (req, res, next) => {
       logger.error(`AI service error: ${err.response.status} - ${JSON.stringify(err.response.data)}`);
       return res.status(err.response.status).json({
         success: false,
-        error: err.response.data?.detail || err.response.data?.error || "Query failed"
+        error: normalizeErrorMessage(
+          err.response.data?.detail || err.response.data?.error,
+          "Query failed"
+        )
       });
     }
     

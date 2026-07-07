@@ -94,9 +94,13 @@ export default function Chat() {
       
       setMessages((prev) => [...prev, aiResponse]);
     } catch (error) {
+      const apiError = error.response?.data?.error;
+      const errorText = typeof apiError === 'string'
+        ? apiError
+        : apiError?.message || error.message || 'Failed to get answer. Please try again.';
       const errorResponse = {
         role: 'assistant',
-        content: `Error: ${error.response?.data?.error || error.message || 'Failed to get answer. Please try again.'}`,
+        content: `Error: ${errorText}`,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorResponse]);

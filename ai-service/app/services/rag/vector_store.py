@@ -176,6 +176,13 @@ class FAISSVectorStore:
         
         index = self._indexes[document_id]
         chunks = self._chunks[document_id]
+
+        if query_embedding.shape[-1] != index.d:
+            raise ValueError(
+                f"Embedding dimension mismatch for {document_id}: "
+                f"query={query_embedding.shape[-1]}, index={index.d}. "
+                "Re-index the document with the matching embedding model."
+            )
         
         # FAISS returns L2 distances
         distances, indices = index.search(query_norm, min(top_k, index.ntotal))
@@ -221,6 +228,16 @@ class FAISSVectorStore:
         """Check if document is in vector store."""
         index_path = self.get_index_path(document_id)
         return index_path.exists()
+
+    def get_document_embedding_dim(self, document_id: str) -> Optional[int]:
+        """Return the stored embedding dimension for a document if available."""
+        if document_id not in self._indexes:
+            self._load_document(document_id)
+
+        if document_id not in self._indexes:
+            return None
+
+        return self._indexes[document_id].d
     
     def _load_document(self, document_id: str) -> bool:
         """Load document index and metadata from disk."""

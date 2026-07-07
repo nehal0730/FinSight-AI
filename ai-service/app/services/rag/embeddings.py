@@ -171,17 +171,35 @@ class EmbeddingService:
     
     def __init__(self, config: EmbeddingConfig):
         self.config = config
-        
-        # Initialize HuggingFace provider (always)
-        self.provider = HuggingFaceEmbeddingProvider(
-            model=config.model.value
-        )
+
+        # Keep a small provider cache so query-time model switches do not
+        # reload the same transformer repeatedly.
+        self._provider_cache: dict[str, HuggingFaceEmbeddingProvider] = {}
+
+        # Initialize the configured provider eagerly so existing code paths keep
+        # behaving the same way when there is only one active embedding model.
+        self.provider = self._get_provider(config.model.value)
         
         # Initialize cache
         cache_dir = Path(__file__).parent.parent.parent.parent / "storage" / "embeddings"
         self.cache = EmbeddingCache(cache_dir) if config.cache_embeddings else None
         
         api_logger.info(f"Embedding service initialized: {config.model.value}")
+
+    _DIMENSION_TO_MODEL = {
+        384: EmbeddingModel.HUGGINGFACE_MINILM.value,
+        768: EmbeddingModel.HUGGINGFACE_MPNET.value,
+    }
+
+    def _get_provider(self, model_name: str) -> HuggingFaceEmbeddingProvider:
+        if model_name not in self._provider_cache:
+            self._provider_cache[model_name] = HuggingFaceEmbeddingProvider(model=model_name)
+        return self._provider_cache[model_name]
+
+    def _get_provider_for_dimension(self, embedding_dim: int | None) -> HuggingFaceEmbeddingProvider:
+        if embedding_dim in self._DIMENSION_TO_MODEL:
+            return self._get_provider(self._DIMENSION_TO_MODEL[embedding_dim])
+        return self.provider
     
     def embed_chunks(
         self,
@@ -245,6 +263,12 @@ class EmbeddingService:
     def get_embedding_dim(self) -> int:
         """Get dimension of embeddings from provider."""
         return self.provider.get_embedding_dim()
+
+    def embed_query_for_dimension(self, query: str, embedding_dim: int | None) -> np.ndarray:
+        """Embed a query using the model that matches the stored index dimension."""
+        provider = self._get_provider_for_dimension(embedding_dim)
+        embedding = provider.embed_texts([query])[0]
+        return np.array(embedding, dtype=np.float32)
     
     def embed_query(self, query: str) -> np.ndarray:
         """

@@ -6,9 +6,7 @@ module.exports = ((err, req, res, next) => {
   res.status(400).json({
     success: false,
     data: null,
-    error: {
-      code: "BAD_REQUEST",
-      message: err.message
-    }
+    error: err.message,
+    errorCode: "BAD_REQUEST"
   });
 });

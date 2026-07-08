@@ -139,7 +139,9 @@ class MongoVectorStore:
             return True
             
         except Exception as e:
-            api_logger.error(f"Failed to add documents to MongoDB: {e}")
+            api_logger.error(
+                f"Failed to add documents to MongoDB: {e}", exc_info=True
+            )
             return False
     
     def search(
@@ -273,7 +275,30 @@ class MongoVectorStore:
             api_logger.info(f"✓ Loaded document from MongoDB: {document_id}")
             return True
         except Exception as e:
-            api_logger.error(f"Failed to load document from MongoDB: {e}")
+            api_logger.error(
+                f"Failed to load document from MongoDB: {e}", exc_info=True
+            )
+            # Clear any partial in-memory state for this document
+            self._indexes.pop(document_id, None)
+            self._metadata.pop(document_id, None)
+            self._chunks.pop(document_id, None)
+            # Self-heal: the stored record can't be deserialized (corrupt or
+            # written by an older/incompatible code path). Remove it so the
+            # next index_document() call rebuilds it cleanly instead of
+            # hitting this same broken record on every query forever.
+            try:
+                collection = self.db["vector_indexes"]
+                result = collection.delete_one({"document_id": document_id})
+                if result.deleted_count:
+                    api_logger.warning(
+                        f"Removed corrupt vector store record for "
+                        f"{document_id}; it will need to be re-indexed."
+                    )
+            except Exception as cleanup_error:
+                api_logger.error(
+                    f"Failed to clean up corrupt record for {document_id}: "
+                    f"{cleanup_error}"
+                )
             return False
     
     def get_stats(self, document_id: str) -> dict:

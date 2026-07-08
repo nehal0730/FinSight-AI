@@ -56,7 +56,7 @@ CRITICAL CONSTRAINTS:
 
 SUMMARY RULES:
 - For summary questions, describe what the document explicitly contains first.
-- Do not claim fraud, risk factors, suspicious activity, or intent unless the document explicitly states them.
+- If asked about fraud, risk factors, suspicious activity, or intent and the document does not explicitly discuss them, DO NOT reply "Information not found in document." Instead, describe what the document DOES contain, then explicitly note that it does not state fraud/risk/intent. "Information not found in document" is reserved ONLY for questions about a completely different topic than anything in the retrieved text (e.g. asking about CEO salary when the document is a transaction log) - never for asking about risk/fraud/summary when the document has any relevant content at all.
 - If the document is only a transaction record, summarize the fields and visible balance/activity trends instead of inventing a narrative.
 
 RESPONSE TEMPLATE:
@@ -65,7 +65,7 @@ RESPONSE TEMPLATE:
 - **Confidence:** [HIGH/MEDIUM/LOW] based on information clarity
 - **Context:** [Brief explanation if needed]
 
-Remember: Your only source of truth is the provided document context. Reject questions about information not present in the document."""
+Remember: Your only source of truth is the provided document context. Only use "Information not found in document" when the retrieved text has nothing at all relevant to the query's subject - not merely because a specific word like "risk" or "fraud" isn't explicitly mentioned."""
 
     # Few-shot examples for better performance
     FINANCIAL_QA_EXAMPLES = """
@@ -95,6 +95,15 @@ A:
 - **Source:** Transaction table sections
 - **Confidence:** MEDIUM
 - **Context:** The summary is limited to what is explicitly shown in the statement.
+
+EXAMPLE 4 - Query mentions risk/fraud but document only has transaction data (do NOT say "Information not found"):
+Q: "Are there any key risk factors discussed?"
+Relevant context: "Salary credited $3,200. Crypto purchase $1,500 (Coinbase). Salary credited $3,200. Crypto purchase $2,000 (Binance)."
+A:
+- **Answer:** The document does not explicitly label anything as a "risk factor." It shows a recurring pattern of salary credits followed by cryptocurrency purchases. This recurring pattern could be observed as a possible point of interest, but the document itself does not state any risk, fraud, or compliance concern.
+- **Source:** Section 1 (transaction listing)
+- **Confidence:** MEDIUM
+- **Context:** No explicit risk-factor language is present, but the retrieved section is directly relevant to the question, so a grounded answer is given instead of "Information not found."
 """
 
     @staticmethod
@@ -163,7 +172,12 @@ Instructions:
 5. Use the response template: Answer | Source | Confidence | Context"""
 
         if any(word in context.query.lower() for word in ("summarize", "summary", "overview", "main points")):
-            user_msg += "\n6. Keep the summary factual and grounded in the retrieved text. Do not invent fraud, risk, or intent unless the document explicitly states it."
+            user_msg += (
+                "\n6. Keep the summary factual and grounded in the retrieved text. "
+                "Do not invent fraud, risk, or intent unless the document explicitly states it - "
+                "but you MUST still describe what the retrieved section actually contains. "
+                "Do not respond with \"Information not found in document\" just because it lacks a risk/fraud narrative."
+            )
         
         return user_msg
     
